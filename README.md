@@ -24,6 +24,7 @@ git clone https://github.com/YimingQiao/delayed-coding.git
 cd delayed-coding
 cargo run --release --example roundtrip
 cargo run --release --example conditional
+cargo run --release --example indexed_records
 cargo test --workspace
 ```
 
@@ -58,6 +59,13 @@ delayed-coding = { git = "https://github.com/YimingQiao/delayed-coding", rev = "
   round-robin states sharing one payload. Rust supports 1/2/4/8 states.
 - `Model::with_tables`: optional 128 KiB encode and/or 512 KiB decode tables.
   Compact alias tables are the default; table choices do not change payloads.
+- `Layout::<24>::push_frequency`: exact physical offsets and payload length from
+  realized frequencies alone, without running the information-state recurrence.
+  `encode` now requests exactly the payload size, avoiding its old worst-case
+  payload allocation and final move (scheduling workspace is still required).
+- `decode_lookahead_into::<24>` / C `dc_decode_lookahead`: opt-in, single-state
+  fixed-model decoding with one physical word of lookahead. Same bytes and checks;
+  no additional table/allocation. Not available for conditional model selection.
 
 The optional Cargo feature `flat-alias` experiments with branch-free alias
 addressing. It helps some fixed-model blocks but regresses measured conditional
@@ -97,6 +105,15 @@ There is no general claim of outperforming rANS. Current measurements are kernel
 experiments on one x86-64 machine, with prebuilt models and reused buffers. They
 exclude model serialization, indexing and whole-file overhead. See the
 [initial findings](benchmarks/RESULTS.md) and raw CSVs.
+
+The [layout/lookahead experiment](benchmarks/LAYOUT_LOOKAHEAD.md) identifies two
+bounded advantages on this machine: faster single-state decoding on a nonuniform
+high-entropy synthetic input, and smaller independently coded short text records
+than the tested byte/64-bit rANS baselines. Four-state rANS still wins throughput;
+DC encoding remains slower. The record comparison includes equal offset indexes,
+but excludes shared model/framing bytes. This is not a whole-database result.
+Packed 512 KiB rANS decode-table adapters are explicitly labelled in the harness;
+they supplement, rather than replace, the unmodified-header baselines.
 
 Tests cover exhaustive short binary strings, every 16-bit code point, random and
 conditional models, reciprocal-division boundaries, interleaving against independent

@@ -18,13 +18,15 @@
 #![forbid(unsafe_code)]
 
 mod codec;
+mod layout;
 mod model;
 
 pub use codec::{decode_interleaved_into, encode_events_interleaved_into, encode_interleaved_into};
 pub use codec::{
-    decode_into, encode, encode_events_into, encode_into, max_encoded_size, Decoder, Event,
-    Workspace,
+    decode_into, decode_lookahead_into, encode, encode_events_into, encode_into, max_encoded_size,
+    Decoder, Event, Workspace,
 };
+pub use layout::Layout;
 pub use model::{DecodedSymbol, Model, TableOptions, PROBABILITY_TOTAL};
 
 /// All recoverable errors. Allocation failure follows Rust's allocator policy.

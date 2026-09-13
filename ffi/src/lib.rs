@@ -2,7 +2,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use delayed_coding::{decode_interleaved_into, encode_interleaved_into};
-use delayed_coding::{decode_into, encode_into, Error, Model, TableOptions, Workspace};
+use delayed_coding::{
+    decode_into, decode_lookahead_into, encode_into, Error, Model, TableOptions, Workspace,
+};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 #[repr(C)]
@@ -243,6 +245,34 @@ pub unsafe extern "C" fn dc_decode_interleaved(
     output: *mut u32,
     count: usize,
 ) -> DcStatus {
+    unsafe { decode_dispatch(model, delay, lanes, input, size, output, count, false) }
+}
+
+/// # Safety
+/// Same pointer contract as dc_decode. Experimental fixed-model, single-lane path.
+#[no_mangle]
+pub unsafe extern "C" fn dc_decode_lookahead(
+    model: *const Model,
+    delay: u32,
+    input: *const u8,
+    size: usize,
+    output: *mut u32,
+    count: usize,
+) -> DcStatus {
+    unsafe { decode_dispatch(model, delay, 1, input, size, output, count, true) }
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn decode_dispatch(
+    model: *const Model,
+    delay: u32,
+    lanes: u32,
+    input: *const u8,
+    size: usize,
+    output: *mut u32,
+    count: usize,
+    lookahead: bool,
+) -> DcStatus {
     guard(|| {
         if model.is_null() || !valid_slice(input, size) || !valid_slice(output, count) {
             return Err(DcStatus::InvalidArgument);
@@ -260,6 +290,15 @@ pub unsafe extern "C" fn dc_decode_interleaved(
         };
         if !matches!(lanes, 1 | 4) {
             return Err(DcStatus::InvalidArgument);
+        }
+        if lookahead {
+            return match delay {
+                16 => decode_lookahead_into::<16>(model, input, output),
+                24 => decode_lookahead_into::<24>(model, input, output),
+                32 => decode_lookahead_into::<32>(model, input, output),
+                _ => return Err(DcStatus::InvalidDelay),
+            }
+            .map_err(DcStatus::from);
         }
         match (delay, lanes) {
             (16, 1) => decode_into::<16>(model, input, output),

@@ -58,6 +58,44 @@ fn owned_handles_and_bounded_buffers() {
                         DcStatus::Ok
                     );
                     assert_eq!(restored, symbols);
+                    if lanes == 1 {
+                        restored.fill(99);
+                        assert_eq!(
+                            dc_decode_lookahead(
+                                model,
+                                delay,
+                                output.as_ptr().add(offset),
+                                size,
+                                restored.as_mut_ptr(),
+                                restored.len()
+                            ),
+                            DcStatus::Ok
+                        );
+                        assert_eq!(restored, symbols);
+                        assert_eq!(
+                            dc_decode_lookahead(
+                                model,
+                                delay,
+                                output.as_ptr().add(offset),
+                                size - 1,
+                                restored.as_mut_ptr(),
+                                restored.len()
+                            ),
+                            DcStatus::TruncatedInput
+                        );
+                        assert_eq!(
+                            dc_decode_lookahead(model, delay, null(), 0, null_mut(), 0),
+                            DcStatus::Ok
+                        );
+                        assert_eq!(
+                            dc_decode_lookahead(model, 15, null(), 0, null_mut(), 0),
+                            DcStatus::InvalidDelay
+                        );
+                        assert_eq!(
+                            dc_decode_lookahead(model, delay, null(), 1, null_mut(), 0),
+                            DcStatus::InvalidArgument
+                        );
+                    }
                     assert_eq!(
                         dc_decode_interleaved(
                             model,

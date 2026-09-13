@@ -1,0 +1,179 @@
+use delayed_coding::{
+    decode_into, decode_lookahead_into, encode, encode_events_interleaved_into, Decoder, Error,
+    Event, Layout, Model, TableOptions, Workspace,
+};
+
+#[test]
+fn allocating_encoder_does_not_retain_worst_case_payload_capacity() {
+    let model = Model::new(&[65536]).unwrap();
+    let input = vec![0; 10000];
+    let payload = encode::<24>(&model, &input).unwrap();
+    assert_eq!(payload.len(), 4);
+    assert_eq!(payload.capacity(), payload.len());
+    let mut output = vec![99; input.len()];
+    decode_into::<24>(&model, &payload, &mut output).unwrap();
+    assert_eq!(input, output);
+}
+
+fn verify<const D: u32, const L: usize>() {
+    let frequencies = [1, 127, 4096, 28672, 32640];
+    let a = Model::new(&frequencies).unwrap();
+    let b = Model::new(&frequencies.into_iter().rev().collect::<Vec<_>>()).unwrap();
+    let mut rng = 123456u64;
+    let symbols: Vec<_> = (0..2049)
+        .map(|_| {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            a.lookup(rng as u16).symbol
+        })
+        .collect();
+    let mut layout = Layout::<D, L>::new().unwrap();
+    let positions: Vec<_> = symbols
+        .iter()
+        .map(|&s| layout.push_frequency(frequencies[s as usize]).unwrap())
+        .collect();
+    for (model, reversed) in [(&a, false), (&b, true)] {
+        let events: Vec<_> = symbols
+            .iter()
+            .map(|&s| Event {
+                model,
+                symbol: if reversed { 4 - s } else { s },
+            })
+            .collect();
+        let mut storage = vec![0; layout.encoded_len()];
+        let range = encode_events_interleaved_into::<D, L>(
+            &events,
+            &mut storage,
+            &mut Workspace::default(),
+        )
+        .unwrap();
+        assert_eq!(range, 0..layout.encoded_len());
+        let mut decoder = Decoder::<D, L>::new(&storage).unwrap();
+        for (event, position) in events.iter().zip(&positions) {
+            let before = decoder.bytes_read();
+            assert_eq!(decoder.read(model).unwrap(), event.symbol);
+            if let Some(offset) = position {
+                assert_eq!(before, *offset);
+                assert_eq!(decoder.bytes_read(), before + 2);
+            } else {
+                assert_eq!(decoder.bytes_read(), before);
+            }
+        }
+        decoder.finish().unwrap();
+        // Appending a suffix never changes the layout of an existing prefix.
+        for n in [0, 1, 2, 3, 16, 127, 2049] {
+            let mut prefix = Layout::<D, L>::new().unwrap();
+            for (event, expected) in events[..n].iter().zip(&positions) {
+                let f = model.frequencies()[event.symbol as usize];
+                assert_eq!(prefix.push_frequency(f).unwrap(), *expected);
+            }
+            let mut bytes = vec![0; prefix.encoded_len()];
+            let range = encode_events_interleaved_into::<D, L>(
+                &events[..n],
+                &mut bytes,
+                &mut Workspace::default(),
+            )
+            .unwrap();
+            assert_eq!(range, 0..prefix.encoded_len());
+        }
+    }
+}
+
+#[test]
+fn layout_is_frequency_only_and_prefix_local() {
+    verify::<16, 1>();
+    verify::<24, 1>();
+    verify::<32, 1>();
+    verify::<16, 2>();
+    verify::<24, 4>();
+    verify::<32, 8>();
+}
+
+#[test]
+fn layout_rejects_invalid_parameters_without_mutation() {
+    assert!(matches!(Layout::<15>::new(), Err(Error::InvalidDelay)));
+    assert!(matches!(Layout::<33>::new(), Err(Error::InvalidDelay)));
+    assert!(matches!(Layout::<24, 0>::new(), Err(Error::InvalidLanes)));
+    assert!(matches!(Layout::<24, 3>::new(), Err(Error::InvalidLanes)));
+    let mut layout = Layout::<24>::new().unwrap();
+    for f in [0, 65537, u32::MAX] {
+        assert_eq!(layout.push_frequency(f), Err(Error::InvalidModel));
+        assert_eq!(layout.encoded_len(), 0);
+    }
+    assert_eq!(layout.push_frequency(65536), Ok(Some(0)));
+}
+
+fn compare<const D: u32>(model: &Model, payload: &[u8], count: usize) {
+    let mut serial = vec![u32::MAX; count];
+    let mut ahead = serial.clone();
+    assert_eq!(
+        decode_into::<D>(model, payload, &mut serial),
+        decode_lookahead_into::<D>(model, payload, &mut ahead)
+    );
+    assert_eq!(serial, ahead);
+}
+
+fn differential<const D: u32>() {
+    let mut rng = 0x5eeda11a5u64;
+    for weights in [
+        vec![65536],
+        vec![65535, 1],
+        vec![32768, 32768],
+        vec![40000, 25536],
+        vec![256; 256],
+        vec![1; 65536],
+    ] {
+        for direct in [false, true] {
+            let model = Model::new(&weights).unwrap().with_tables(TableOptions {
+                direct_encode: false,
+                direct_decode: direct,
+            });
+            for count in [0, 1, 2, 3, 8, 17, 127, 4097] {
+                let symbols: Vec<_> = (0..count)
+                    .map(|_| {
+                        rng ^= rng << 13;
+                        rng ^= rng >> 7;
+                        rng ^= rng << 17;
+                        model.lookup(rng as u16).symbol
+                    })
+                    .collect();
+                let mut bytes = encode::<D>(&model, &symbols).unwrap();
+                let mut output = vec![0; count];
+                decode_lookahead_into::<D>(&model, &bytes, &mut output).unwrap();
+                assert_eq!(symbols, output);
+                compare::<D>(&model, &bytes, count);
+                for cut in 0..bytes.len().min(64) {
+                    compare::<D>(&model, &bytes[..cut], count);
+                }
+                if !bytes.is_empty() {
+                    bytes[0] ^= 0xff;
+                }
+                compare::<D>(&model, &bytes, count);
+                bytes.push(17);
+                compare::<D>(&model, &bytes, count);
+            }
+            for _ in 0..100 {
+                let mut bytes = vec![0; (rng % 97) as usize];
+                for byte in &mut bytes {
+                    rng ^= rng << 13;
+                    rng ^= rng >> 7;
+                    rng ^= rng << 17;
+                    *byte = rng as u8;
+                }
+                compare::<D>(&model, &bytes, (rng % 129) as usize);
+            }
+        }
+    }
+}
+
+#[test]
+fn lookahead_matches_serial_including_malformed_inputs() {
+    differential::<16>();
+    differential::<24>();
+    differential::<32>();
+    assert_eq!(
+        decode_lookahead_into::<15>(&Model::new(&[65536]).unwrap(), &[], &mut []),
+        Err(Error::InvalidDelay)
+    );
+}

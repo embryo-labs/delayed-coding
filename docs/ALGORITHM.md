@@ -43,6 +43,41 @@ virtual words. It then walks backwards from n=0, splitting n into quotient and
 remainder by w. The remainder identifies the symbol's code word. Virtual words
 are embedded back into n; physical words are written backwards to the output.
 
+### Executable layout independence
+
+`Layout<DELAY, LANES>` implements the capacity-only recurrence. For a single lane,
+with capacity d before a read, let v = [d >= 2^DELAY]. The next capacity is
+`floor(d / 65536^v) * w`. The source decision and next capacity depend only on d
+and the realized frequency w, not the interval position, remainder, or numerator.
+Induction from d=1 proves that the ordered frequency sequence determines the
+complete physical/virtual schedule. For interleaving, apply the induction to each
+lane with a fixed lane assignment. Every physical word contributes exactly two
+raw bytes, so the same computation gives exact offsets and payload length.
+
+Tests compare the predicted offsets against the real decoder's byte cursor,
+including reordered symbol mappings, prefixes and lane/delay configurations.
+This is schedule independence, not codeword-value independence: a suffix can
+change earlier physical words. Conditional frequencies may not yet be known at
+decode time. The standard rANS information-state normalization does not have
+this general frequency-only schedule property; this is not a global novelty claim.
+
+The allocating `encode` API now schedules first and allocates exactly the payload,
+then embeds directly into that allocation. It still stores one schedule byte per
+symbol. The indexed-record example also computes layout before assigning slices
+of a shared arena; its subsequent `encode_into` calls rebuild/validate schedules,
+so that example trades an extra pass for exact preassigned storage.
+
+### Opt-in physical lookahead
+
+`decode_lookahead_into` keeps one predecoded physical word pending. Consuming it
+triggers lookup of the next physical word, independently of the current numerator
+update. Virtual words still require the numerator, and the capacity recurrence
+still controls consumption. Only a fixed model is supported. Input reads remain
+bounded and unused prefetched words do not count as consumed for final validation.
+Larger on-stack batches were tested separately and did not show general benefits.
+See the [experiment report](../benchmarks/LAYOUT_LOOKAHEAD.md) for wins and losses;
+source-level independence alone is not proof of a shorter machine critical path.
+
 Before multiplication d < 2^D and w <= 2^16, so the product is < 2^(D+16).
 Valid backward states obey the corresponding bound. With D <= 32, the encoder
 state is < 2^48, so u64 arithmetic has headroom. Malformed payloads do not inherit

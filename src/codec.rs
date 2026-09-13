@@ -1,4 +1,4 @@
-use crate::{model::Symbol, Error, Model};
+use crate::{model::Symbol, Error, Layout, Model};
 use std::ops::Range;
 
 /// Models are borrowed for the duration of encoding; lifetimes prevent stale references.
@@ -62,19 +62,22 @@ fn encode_impl<'a, const DELAY: u32, const LANES: usize>(
     output: &mut [u8],
     workspace: &mut Workspace,
 ) -> Result<Range<usize>, Error> {
-    validate_delay::<DELAY>()?;
-    if !matches!(LANES, 1 | 2 | 4 | 8) {
-        return Err(Error::InvalidLanes);
+    let bytes = schedule_impl::<DELAY, LANES>(count, &event_at, workspace)?;
+    if bytes > output.len() {
+        return Err(Error::OutputTooSmall);
     }
+    Ok(embed_impl::<LANES>(count, &event_at, output, workspace))
+}
+
+fn schedule_impl<'a, const DELAY: u32, const LANES: usize>(
+    count: usize,
+    event_at: &impl Fn(usize) -> Event<'a>,
+    workspace: &mut Workspace,
+) -> Result<usize, Error> {
+    let mut layout = Layout::<DELAY, LANES>::new()?;
     max_encoded_size(count)?;
     workspace.virtual_symbols.resize(count, 0);
-    let mut denominators = [1u64; LANES];
-    let mut virtuals = [false; LANES];
-    let mut words = 0;
     for i in 0..count {
-        let lane = i & (LANES - 1);
-        let denominator = &mut denominators[lane];
-        let next_virtual = &mut virtuals[lane];
         let event = event_at(i);
         let symbol = event
             .model
@@ -84,17 +87,17 @@ fn encode_impl<'a, const DELAY: u32, const LANES: usize>(
         if symbol.frequency == 0 {
             return Err(Error::InvalidSymbol);
         }
-        workspace.virtual_symbols[i] = u8::from(*next_virtual);
-        words += usize::from(!*next_virtual);
-        *denominator *= u64::from(symbol.frequency);
-        *next_virtual = *denominator >= (1u64 << DELAY);
-        if *next_virtual {
-            *denominator >>= 16;
-        }
+        workspace.virtual_symbols[i] = u8::from(layout.push_frequency(symbol.frequency)?.is_none());
     }
-    if words > output.len() / 2 {
-        return Err(Error::OutputTooSmall);
-    }
+    Ok(layout.encoded_len())
+}
+
+fn embed_impl<'a, const LANES: usize>(
+    count: usize,
+    event_at: &impl Fn(usize) -> Event<'a>,
+    output: &mut [u8],
+    workspace: &Workspace,
+) -> Range<usize> {
     let mut position = output.len();
     let mut numerators = [0u64; LANES];
     for i in (0..count).rev() {
@@ -113,7 +116,7 @@ fn encode_impl<'a, const DELAY: u32, const LANES: usize>(
             output[position..position + 2].copy_from_slice(&word.to_be_bytes());
         }
     }
-    Ok(position..output.len())
+    position..output.len()
 }
 
 /// Writes backwards, returning the payload's range in the caller's buffer.
@@ -174,12 +177,19 @@ pub fn encode_events_interleaved_into<const DELAY: u32, const LANES: usize>(
     encode_impl::<DELAY, LANES>(events.len(), |i| events[i], output, workspace)
 }
 
-/// Allocating convenience API. Use encode_into and a reusable workspace in hot paths.
+/// Allocates exactly the payload length, without a worst-case payload buffer or
+/// a final payload move. The per-symbol scheduling workspace is still required.
+/// Use encode_into and a reusable workspace in hot paths.
 pub fn encode<const DELAY: u32>(model: &Model, symbols: &[u32]) -> Result<Vec<u8>, Error> {
-    let mut output = vec![0; max_encoded_size(symbols.len())?];
-    let range = encode_into::<DELAY>(model, symbols, &mut output, &mut Workspace::default())?;
-    output.copy_within(range.clone(), 0);
-    output.truncate(range.len());
+    let event_at = |i| Event {
+        model,
+        symbol: symbols[i],
+    };
+    let mut workspace = Workspace::default();
+    let bytes = schedule_impl::<DELAY, 1>(symbols.len(), &event_at, &mut workspace)?;
+    let mut output = vec![0; bytes];
+    let range = embed_impl::<1>(symbols.len(), &event_at, &mut output, &workspace);
+    debug_assert_eq!(range.start, 0);
     Ok(output)
 }
 
@@ -282,6 +292,52 @@ pub fn decode_into<const DELAY: u32>(
     output: &mut [u32],
 ) -> Result<(), Error> {
     decode_interleaved_into::<DELAY, 1>(model, input, output)
+}
+
+/// Experimental single-state, fixed-model decoder with one physical word of lookahead.
+///
+/// Uses the exact same payload as `decode_into`. The next physical word's model
+/// lookup is independent of the current information-state update. Keeping its
+/// decoded entry in registers can overlap those operations. No allocation or
+/// additional model table is required. This is not suitable for per-symbol model
+/// selection, and is not necessarily faster on every distribution or processor.
+/// All reads are bounded; final validation is identical to `decode_into`.
+pub fn decode_lookahead_into<const DELAY: u32>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+) -> Result<(), Error> {
+    validate_delay::<DELAY>()?;
+    let mut physical = input
+        .chunks_exact(2)
+        .map(|bytes| model.lookup(u16::from_be_bytes([bytes[0], bytes[1]])));
+    let mut pending = physical.next();
+    let (mut position, mut numerator, mut denominator) = (0usize, 0u64, 1u64);
+    for symbol in output {
+        let decoded = if denominator >= 1u64 << DELAY {
+            let decoded = model.lookup(numerator as u16);
+            numerator >>= 16;
+            denominator >>= 16;
+            decoded
+        } else {
+            let decoded = pending.ok_or(Error::TruncatedInput)?;
+            pending = physical.next();
+            position += 2;
+            decoded
+        };
+        numerator = numerator
+            .wrapping_mul(u64::from(decoded.frequency))
+            .wrapping_add(u64::from(decoded.remainder));
+        denominator *= u64::from(decoded.frequency);
+        *symbol = decoded.symbol;
+    }
+    if position != input.len() {
+        return Err(Error::TrailingInput);
+    }
+    if numerator != 0 {
+        return Err(Error::InvalidState);
+    }
+    Ok(())
 }
 
 pub fn decode_interleaved_into<const DELAY: u32, const LANES: usize>(

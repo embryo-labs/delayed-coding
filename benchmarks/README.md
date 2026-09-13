@@ -115,3 +115,17 @@ For the experimental flat alias layout, configure a separate CMake build with
 `cargo bench --features flat-alias --bench throughput -- 4096`.
 Compare fixed models **and** model switching; the latter regresses substantially
 in the initial experiment, which is why this feature is not enabled by default.
+
+## Layout / lookahead extension
+
+The [scoped layout/lookahead report](LAYOUT_LOOKAHEAD.md) documents the optional
+one-state decoder and the new `ramp256` nonuniform high-entropy input. The regular
+harness now also includes explicitly labelled 512 KiB packed-table rANS adapters
+for a direct-table control; upstream headers are unchanged. These adapters are
+not claimed to be the best possible rANS kernels.
+
+`compare_rans --records PATH [--check]` resets each coder for 8/16/32/64/256/4096
+byte records, reuses one global model, validates every record, and reports total
+payload plus the same u32 offset index. This mode measures sizes, not throughput;
+it excludes shared model/framing metadata. `indexed_records` is the executable
+Rust exact-layout/random-access example.

@@ -75,6 +75,13 @@ rANS matter; SIMD and alias variants remain mandatory before broad claims.
 
 ## Progress
 
+- 2026-09-13: implemented frequency-only `Layout` offsets/length, exact-size
+  allocating encoding, opt-in single-state physical lookahead (Rust/C), and an
+  exactly allocated indexed-record example. Differential tests cover layout
+  invariance and lookahead behavior on valid/malformed input. See
+  [scoped results](benchmarks/LAYOUT_LOOKAHEAD.md): nonuniform high-entropy
+  single-state decode and short-record size wins, not a general rANS win.
+
 - Repository boundaries and milestone acceptance specified.
 - Original Blitzcrank Release build passed with GCC 12.2.
 - Safe Rust core, C ABI, CMake target and examples implemented. The initial C++

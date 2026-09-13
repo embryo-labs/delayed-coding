@@ -97,6 +97,8 @@ if(DELAYED_CODING_RANS_DIR)
         endforeach()
         add_test(NAME rans_file_roundtrip
             COMMAND compare_rans --file "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" --check)
+        add_test(NAME rans_records_roundtrip
+            COMMAND compare_rans --records "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" --check)
         if(DELAYED_CODING_BUILD_SIMD_BENCHMARK)
             add_test(NAME rans_simd_file_roundtrip
                 COMMAND compare_rans_simd --file "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt" --check)

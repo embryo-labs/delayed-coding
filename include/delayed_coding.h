@@ -47,6 +47,11 @@ DcStatus dc_encode(const DcModel* model, uint32_t delay,
 DcStatus dc_decode(const DcModel* model, uint32_t delay,
     const uint8_t* input, size_t size, uint32_t* output, size_t count);
 
+/* Experimental single-lane fixed-model physical-word lookahead. Same format and
+ * checks as dc_decode. No extra table/allocation. Workload-dependent speed. */
+DcStatus dc_decode_lookahead(const DcModel* model, uint32_t delay,
+    const uint8_t* input, size_t size, uint32_t* output, size_t count);
+
 /* Same contracts as above, with 1 or 4 round-robin coding states.
  * Lane count must be stored externally with delay/model/symbol count. */
 DcStatus dc_encode_interleaved(const DcModel* model, uint32_t delay, uint32_t lanes,

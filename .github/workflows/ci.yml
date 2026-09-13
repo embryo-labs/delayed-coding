@@ -20,6 +20,8 @@ jobs:
       - run: cargo test --workspace --release --offline --locked
       - run: cargo test --features reference-division --offline --locked
       - run: cargo test --workspace --all-features --release --offline --locked
+      - run: cargo run --example indexed_records --offline --locked
+      - run: cargo test --example physical_lookahead --offline --locked
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2 && ctest --test-dir build --output-on-failure
       - run: cmake -S tests/cmake_consumer -B build-consumer -DDELAYED_CODING_SOURCE_DIR="$PWD" && cmake --build build-consumer -j2 && ctest --test-dir build-consumer --output-on-failure
   safety:

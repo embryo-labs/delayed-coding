@@ -1,5 +1,9 @@
 # Performance experiments — 2026-09-12–13
 
+Latest scoped results: [exact layouts, physical lookahead and independent short
+records](LAYOUT_LOOKAHEAD.md). Includes negative results and stronger packed-table
+rANS adapters. Earlier sections below retain the historical experiments.
+
 Machine: Intel Xeon Platinum 8474C, Linux x86-64. CPU affinity: logical CPU 2.
 Rust 1.92.0; GCC 12.2.0, CMake Release. Rust release uses thin LTO and one codegen
 unit. No native-CPU flags. rANS upstream:
