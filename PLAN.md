@@ -10,6 +10,13 @@ comparison or treat an alias implementation detail as the algorithmic contributi
 
 ## Architecture
 
+Latest checkpoint (2026-09-13): [upstream baseline calibration](benchmarks/UPSTREAM_CALIBRATION.md)
+supersedes earlier relative-rANS speed claims. Original programs now run separately;
+shared benchmarks include extracted upstream loops and a labelled four-state
+derived control. Four-state rANS64 is faster than current DC4 on book1 (2.69 vs
+3.21 ns/symbol); upstream SSE8 is faster still, with a different state count.
+The application-level DC advantage remains an open research objective.
+
 `YimingQiao/delayed-coding` owns the standalone entropy coder, normalized models,
 symbol lookup, bounded memory APIs, reference tests, and reproducible rANS comparisons.
 `embryo-labs/Blitzcrank` owns semantic models, learning, storage, indexes and record

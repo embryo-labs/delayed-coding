@@ -57,6 +57,7 @@ struct Model {
 #ifdef DELAYED_CODING_HAVE_RANS_SIMD
 #include "ryg_simd_adapter.h"
 #endif
+#include "ryg_original_adapter.h"
 
 struct Delayed {
     DcModel* model = nullptr;
@@ -169,6 +170,8 @@ struct Rans {
     size_t bytes() const { return size; }
 };
 
+#include "ryg_grouped_adapter.h"
+
 template<class Function>
 double median_ns(size_t repeats, Function run) {
     std::vector<double> samples;
@@ -250,6 +253,15 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     measure(distribution, "rans_byte_4", b4, input);
     measure(distribution, "rans64_1", w1, input);
     measure(distribution, "rans64_4", w4, input);
+    Rans64Grouped<4> grouped_rans4(model, count);
+    grouped_rans4.validate_with_generic(input);
+    measure(distribution, "rans64_upstream_style_4", grouped_rans4, input);
+    OriginalRans<1> original64(model, count);
+    measure(distribution, "rans64_upstream_2", original64, input);
+    if (*std::max_element(model.frequencies.begin(), model.frequencies.end()) < 65536) {
+        OriginalRans<0> original_byte(model, count);
+        measure(distribution, "rans_byte_upstream_2", original_byte, input);
+    }
     measure(distribution, "rans64_packed_1", wp1, input);
     measure(distribution, "rans64_packed_4", wp4, input);
     measure(distribution, "rans_byte_packed_1", bp1, input);
@@ -262,6 +274,8 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     if (*std::max_element(model.frequencies.begin(), model.frequencies.end()) < 65536) {
         RansSimd simd(model, count);
         measure(distribution, "rans_sse41_4", simd, input);
+        OriginalRans<2> original_simd(model, count);
+        measure(distribution, "rans_sse41_upstream_8", original_simd, input);
     } else {
         std::cerr << "upstream SIMD variant skipped: one-symbol model is unsupported\n";
     }
@@ -324,6 +338,7 @@ static void record_sizes(const char* name, Codec& codec, const std::vector<uint3
         << index << ',' << payload + index << ',' << double(payload) / records << '\n';
 }
 
+#ifndef DC_CALIBRATION_DRIVER
 int main(int argc, char** argv) {
     try {
         if (const auto* filter = std::getenv("DC_BENCH_CODEC")) codec_filter = filter;
@@ -405,3 +420,4 @@ int main(int argc, char** argv) {
         std::cerr << "validation checksum=" << checksum << '\n';
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
+#endif

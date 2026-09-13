@@ -1,5 +1,11 @@
 # Speed checkpoint: branchless four-state DC
 
+**Historical checkpoint; relative-rANS speed conclusions superseded.** The DC
+before/after improvements remain measured, but the old rANS adapters did not
+preserve upstream scheduling. The [corrected baseline](UPSTREAM_CALIBRATION.md)
+has four-state rANS64 at 2.69 ns/symbol versus DC4 at 3.21 on book1. Do not cite
+this report's DC/rANS lead as an advantage over optimized rANS.
+
 2026-09-13. Source baseline: `1f8f872faab908065ca4c439bbe90475a461fef5`;
 optimized source: the commit containing this report. This is a fixed-model
 kernel improvement, not completion of the Blitzcrank application milestone.

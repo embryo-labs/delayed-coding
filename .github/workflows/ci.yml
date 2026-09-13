@@ -70,6 +70,9 @@ jobs:
           ref: c9d162d996fd600315af9ae8eb89d832576cb32d
           path: upstream-rans
       - run: >-
+          cmake -DUPSTREAM="$PWD/upstream-rans" -DOUTPUT_DIR="$PWD/build-original"
+          -DCPU=none -P benchmarks/run_upstream_original.cmake
+      - run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DDELAYED_CODING_RANS_DIR="$PWD/upstream-rans"
           -DDELAYED_CODING_BUILD_SIMD_BENCHMARK=ON

@@ -1,5 +1,42 @@
 # Reproducing benchmarks
 
+Start with the [upstream calibration report](UPSTREAM_CALIBRATION.md). Historical
+generic rANS adapters are retained as controls, not advertised as upstream-speed
+implementations. The build requires the complete pinned checkout (LF source files);
+source/header hashes are verified before extracting original coding blocks.
+
+## Original programs and adapter calibration
+
+After checking out the pinned upstream revision below, on x86-64 Linux:
+
+```sh
+# Original Makefile flags, unchanged source/timers, original book1 and u8 output.
+# Use a new output directory; no files are written into the upstream checkout.
+cmake -DUPSTREAM=/tmp/ryg_rans -DOUTPUT_DIR=/tmp/rans-original-results \
+  -DCPU=2 -P benchmarks/run_upstream_original.cmake
+# With the SIMD-enabled build described below:
+taskset -c 2 build/calibrate_upstream /tmp/ryg_rans/book1
+taskset -c 2 build/calibrate_upstream_scalar /tmp/ryg_rans/book1
+```
+
+Calibration preserves upstream normalization (14-bit scalar, 12-bit SIMD), tests
+both u8/u32 I/O, and verifies encoded bytes against a scalar-per-symbol oracle.
+The scalar-only executable omits the SSE4.1 compiler flag. Both retain upstream
+assertions. `--check` covers empty blocks with a supplied model, short tails and
+several alphabets; these checks also run through CTest. CI runs original programs
+with `CPU=none` for correctness only, not as stable performance measurements.
+
+New shared-harness rows distinguish provenance:
+
+- `rans_byte_upstream_2`, `rans64_upstream_2`: extracted original two-state loops.
+- `rans64_upstream_style_4`: derived four-state loop, preserving lookup-all,
+  step-all, renormalize-all ordering; byte-checked against the generic encoder.
+- `rans_sse41_upstream_8`: extracted original two-group/eight-state SIMD loop.
+- Older `rans64_4`, byte and SSE4 rows: our historical adapters using upstream
+  headers, not the complete original demonstration loops.
+
+## Shared probability / u32 benchmark
+
 No benchmark dependency is downloaded automatically. For the upstream comparison:
 
 ```sh
@@ -26,8 +63,8 @@ best possible rANS encoder); their main purpose is a compact-lookup decoder comp
 - Same generated u32 symbol arrays, same normalized 16-bit weights, same process.
 - Both sides write u32 symbols, avoiding an output-width mismatch. `ns/symbol` is
   the primary metric; payload bits/symbol is reported beside it.
-- rANS uses unmodified `rans_byte.h` / `rans64.h` and the direct symbol lookup
-  style of the upstream examples. One and four states are separate rows.
+- rANS uses unmodified `rans_byte.h` / `rans64.h`. Loop provenance and state count
+  are explicit above; an unchanged header is not a claim of optimal outer loops.
 - Alias rows include unmodified upstream `main_alias.cpp`, with only the demo
   entry point renamed. Models use exactly the same weights without renormalizing.
   Decoder tables occupy 5.5 KiB (`divider`, `slot_adjust`, `slot_freqs`, `sym_id`),
@@ -78,7 +115,8 @@ taskset -c 2 ./build/compare_rans_simd --file /tmp/ryg_rans/book1
 
 Requires x86 Linux/Windows, GCC/Clang and an SSE4.1-capable CPU. This separate
 executable compiles C++ with `-msse4.1`; the Rust core retains its ordinary flags.
-It uses the unmodified `rans_word_sse41.h` four-state decoder. That implementation
+It uses the unmodified `rans_word_sse41.h` four-state decoder, in either the old
+single-group adapter or the extracted upstream two-group/eight-state loop. It
 fixes probability precision at 12 bits: the entire suite first constructs 12-bit
 weights and multiplies them by 16 for all non-SIMD codecs. Thus probabilities and
 input symbols match exactly within a run. Rows carry `_p12`; especially the

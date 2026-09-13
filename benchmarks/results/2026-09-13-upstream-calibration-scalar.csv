@@ -1,0 +1,5 @@
+codec,probability_bits,io_bits,symbols,payload_bytes,encode_ns_per_symbol,decode_ns_per_symbol
+upstream_byte_2,14,8,768771,435117,3.7939,4.8671
+upstream_byte_2,14,32,768771,435117,3.9351,4.8598
+upstream_rans64_2,14,8,768771,435120,2.4423,3.8493
+upstream_rans64_2,14,32,768771,435120,2.5242,3.7595

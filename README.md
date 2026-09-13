@@ -122,9 +122,10 @@ See [integration status and limits](docs/BLITZCRANK_INTEGRATION.md).
 
 ## Performance and validation
 
-[Benchmark instructions](benchmarks/README.md) compare against **unmodified,
-pinned upstream ryg_rans**, including scalar and four-state byte/64-bit and
-compact alias variants (the latter on x86 Linux/Windows).
+[Benchmark instructions](benchmarks/README.md) distinguish unmodified pinned
+upstream ryg_rans **programs**, mechanically extracted two-state/eight-state
+loops, and explicitly labelled derived adapters. Unmodified headers alone do
+not guarantee the performance of the upstream programs.
 Both sides consume/produce the same u32 symbol representation and use identical
 16-bit normalized frequencies. An opt-in SSE4.1 comparison uses a separate,
 probability-matched 12-bit suite. Reports include payload size alongside speed.
@@ -133,6 +134,14 @@ There is no general claim of outperforming rANS. Current measurements are kernel
 experiments on one x86-64 machine, with prebuilt models and reused buffers. They
 exclude model serialization, indexing and whole-file overhead. See the
 [initial findings](benchmarks/RESULTS.md) and raw CSVs.
+
+**Baseline correction (2026-09-13):** the earlier book1 speed checkpoint compared
+DC against underoptimized adapter loops. With upstream-style four-state scheduling,
+rANS64 decodes in 2.69 ns/symbol versus DC4's 3.21, at identical probabilities and
+u32 output. The extracted upstream eight-state SSE4.1 loop reaches 1.77 in the
+separate matched 12-bit suite (not an equal-state-count comparison). The earlier
+DC lead does not hold. See [source calibration and raw results](benchmarks/UPSTREAM_CALIBRATION.md),
+including the remaining scalar-wrapper timing discrepancy.
 
 The [layout/lookahead experiment](benchmarks/LAYOUT_LOOKAHEAD.md) identifies two
 bounded advantages on this machine: faster single-state decoding on a nonuniform

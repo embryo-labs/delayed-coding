@@ -1,0 +1,27 @@
+rANS encode:
+6470642 clocks, 8.4 clocks/symbol (237.9MiB/s)
+6083442 clocks, 7.9 clocks/symbol (253.1MiB/s)
+6076762 clocks, 7.9 clocks/symbol (253.3MiB/s)
+6070128 clocks, 7.9 clocks/symbol (253.6MiB/s)
+6081440 clocks, 7.9 clocks/symbol (253.2MiB/s)
+rANS: 435116 bytes
+9586314 clocks, 12.5 clocks/symbol (160.6MiB/s)
+9563696 clocks, 12.4 clocks/symbol (161.0MiB/s)
+9680748 clocks, 12.6 clocks/symbol (159.0MiB/s)
+9612024 clocks, 12.5 clocks/symbol (160.2MiB/s)
+9609242 clocks, 12.5 clocks/symbol (160.2MiB/s)
+decode ok!
+
+interleaved rANS encode:
+4043032 clocks, 5.3 clocks/symbol (380.8MiB/s)
+4008074 clocks, 5.2 clocks/symbol (384.1MiB/s)
+3993950 clocks, 5.2 clocks/symbol (385.5MiB/s)
+3992388 clocks, 5.2 clocks/symbol (385.6MiB/s)
+3979840 clocks, 5.2 clocks/symbol (386.8MiB/s)
+interleaved rANS: 435120 bytes
+5715340 clocks, 7.4 clocks/symbol (269.3MB/s)
+5557050 clocks, 7.2 clocks/symbol (277.0MB/s)
+5527474 clocks, 7.2 clocks/symbol (278.5MB/s)
+5536040 clocks, 7.2 clocks/symbol (278.1MB/s)
+5542300 clocks, 7.2 clocks/symbol (277.8MB/s)
+decode ok!
