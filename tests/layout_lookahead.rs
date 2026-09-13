@@ -177,3 +177,83 @@ fn lookahead_matches_serial_including_malformed_inputs() {
         Err(Error::InvalidDelay)
     );
 }
+
+fn interleaved_differential<const D: u32, const L: usize>() {
+    use delayed_coding::{
+        decode_interleaved_into, decode_lookahead_interleaved_into, encode_interleaved_into,
+    };
+    let model = Model::new(&[1, 127, 4096, 28672, 32640]).unwrap();
+    let mut rng = 123456u64;
+    for n in [0, 1, 2, 3, 4, 5, 7, 17, 127, 4097] {
+        let symbols: Vec<_> = (0..n)
+            .map(|_| {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                model.lookup(rng as u16).symbol
+            })
+            .collect();
+        let mut bytes = vec![0; n * 2];
+        let range = encode_interleaved_into::<D, L>(
+            &model,
+            &symbols,
+            &mut bytes,
+            &mut Workspace::default(),
+        )
+        .unwrap();
+        let payload = &bytes[range];
+        let mut output = vec![99; n];
+        decode_lookahead_interleaved_into::<D, L>(&model, payload, &mut output).unwrap();
+        assert_eq!(symbols, output);
+        if L == 4 {
+            delayed_coding::decode_grouped4_into::<D>(&model, payload, &mut output).unwrap();
+            assert_eq!(symbols, output);
+        }
+        for cut in 0..payload.len().min(64) {
+            let mut a = vec![99; n];
+            let mut b = a.clone();
+            assert_eq!(
+                decode_interleaved_into::<D, L>(&model, &payload[..cut], &mut a),
+                decode_lookahead_interleaved_into::<D, L>(&model, &payload[..cut], &mut b)
+            );
+            assert_eq!(a, b);
+            if L == 4 {
+                let mut c = vec![99; n];
+                let mut d = vec![99; n];
+                assert_eq!(
+                    decode_interleaved_into::<D, L>(&model, &payload[..cut], &mut c),
+                    delayed_coding::decode_grouped4_into::<D>(&model, &payload[..cut], &mut d)
+                );
+                assert_eq!(c, d);
+            }
+        }
+        for byte in &mut bytes {
+            *byte ^= (rng >> 8) as u8;
+        }
+        let mut a = vec![99; n];
+        let mut b = a.clone();
+        assert_eq!(
+            decode_interleaved_into::<D, L>(&model, &bytes, &mut a),
+            decode_lookahead_interleaved_into::<D, L>(&model, &bytes, &mut b)
+        );
+        assert_eq!(a, b);
+        if L == 4 {
+            let mut c = vec![99; n];
+            let mut d = vec![99; n];
+            assert_eq!(
+                decode_interleaved_into::<D, L>(&model, &bytes, &mut c),
+                delayed_coding::decode_grouped4_into::<D>(&model, &bytes, &mut d)
+            );
+            assert_eq!(c, d);
+        }
+    }
+}
+
+#[test]
+fn interleaved_lookahead_matches_serial() {
+    interleaved_differential::<16, 4>();
+    interleaved_differential::<24, 4>();
+    interleaved_differential::<32, 4>();
+    interleaved_differential::<24, 2>();
+    interleaved_differential::<24, 8>();
+}

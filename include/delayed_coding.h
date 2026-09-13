@@ -9,6 +9,8 @@ extern "C" {
 
 typedef struct DcModel DcModel;
 typedef struct DcWorkspace DcWorkspace;
+typedef struct DcBranch DcBranch;
+typedef struct DcInterval { uint32_t start; uint32_t end; } DcInterval;
 typedef enum DcStatus {
     DC_OK = 0, DC_INVALID_ARGUMENT = 1, DC_INVALID_MODEL = 2,
     DC_INVALID_SYMBOL = 3, DC_INVALID_DELAY = 4, DC_INPUT_TOO_LARGE = 5,
@@ -32,6 +34,21 @@ void dc_model_free(DcModel* model);
 DcStatus dc_workspace_new(DcWorkspace** out);
 void dc_workspace_free(DcWorkspace* workspace);
 
+/* Import one selected branch's exact mapping. Intervals must be sorted, disjoint,
+ * nonempty and within [0,65536); end may equal 65536. Their lengths must sum to
+ * frequency. Construction copies the mapping; handles are immutable/shareable.
+ * Single intervals/raw words need no large identity table. */
+DcStatus dc_branch_new(const DcInterval* intervals, size_t count, uint32_t frequency, DcBranch** out);
+void dc_branch_free(DcBranch* branch);
+
+/* One C call per block of semantic-model branches, with 1 or 4 coding states.
+ * Handles/array remain live and immutable during the call. Workspace and output
+ * follow dc_encode's exclusive/disjoint ownership contract. No per-block heap
+ * allocation once Workspace is large enough. Offset/size assigned on success. */
+DcStatus dc_encode_branches(const DcBranch* const* branches, size_t count,
+    uint32_t delay, uint32_t lanes, uint8_t* output, size_t capacity,
+    DcWorkspace* workspace, size_t* offset, size_t* size);
+
 /* Output is written backwards. On success payload = output + offset, size bytes.
  * Capacity 2*count is always sufficient when count does not overflow size_t.
  * Invalid symbols/capacity are rejected before writing payload bytes.
@@ -50,6 +67,11 @@ DcStatus dc_decode(const DcModel* model, uint32_t delay,
 /* Experimental single-lane fixed-model physical-word lookahead. Same format and
  * checks as dc_decode. No extra table/allocation. Workload-dependent speed. */
 DcStatus dc_decode_lookahead(const DcModel* model, uint32_t delay,
+    const uint8_t* input, size_t size, uint32_t* output, size_t count);
+DcStatus dc_decode_lookahead_interleaved(const DcModel* model, uint32_t delay, uint32_t lanes,
+    const uint8_t* input, size_t size, uint32_t* output, size_t count);
+/* Experimental capacity-planned four-state group. Same four-lane payload. */
+DcStatus dc_decode_grouped4(const DcModel* model, uint32_t delay,
     const uint8_t* input, size_t size, uint32_t* output, size_t count);
 
 /* Same contracts as above, with 1 or 4 round-robin coding states.

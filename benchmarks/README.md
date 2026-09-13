@@ -129,3 +129,11 @@ byte records, reuses one global model, validates every record, and reports total
 payload plus the same u32 offset index. This mode measures sizes, not throughput;
 it excludes shared model/framing metadata. `indexed_records` is the executable
 Rust exact-layout/random-access example.
+
+## Four-state and Blitzcrank bridge extension
+
+The regular harness also reports opt-in four-state physical lookahead and grouped
+capacity-planned DC decoding; `--records` includes one- and four-state size rows
+for both families. See [the experiment report](BLITZCRANK_FOUR_STATE.md) for
+canonical results, intermediate regressions and the real Census encoder bridge.
+The bridge benchmark compares Rust DC to original C++ DC, **not** to rANS.

@@ -1,20 +1,26 @@
 #![no_main]
 use delayed_coding::{
-    decode_interleaved_into, decode_lookahead_into, encode_interleaved_into, Model, TableOptions,
-    Workspace,
+    decode_interleaved_into, decode_lookahead_interleaved_into, encode_interleaved_into, Model,
+    TableOptions, Workspace,
 };
 use libfuzzer_sys::fuzz_target;
 
 fn exercise<const D: u32, const L: usize>(model: &Model, payload: &[u8], output_size: usize) {
     let mut output = vec![0; output_size];
     let result = decode_interleaved_into::<D, L>(model, payload, &mut output);
-    if L == 1 {
-        let mut ahead = vec![0; output_size];
+    let mut ahead = vec![0; output_size];
+    assert_eq!(
+        result,
+        decode_lookahead_interleaved_into::<D, L>(model, payload, &mut ahead)
+    );
+    assert_eq!(output, ahead);
+    if L == 4 {
+        let mut grouped = vec![0; output_size];
         assert_eq!(
             result,
-            decode_lookahead_into::<D>(model, payload, &mut ahead)
+            delayed_coding::decode_grouped4_into::<D>(model, payload, &mut grouped)
         );
-        assert_eq!(output, ahead);
+        assert_eq!(output, grouped);
     }
     let input: Vec<_> = payload
         .iter()
@@ -28,10 +34,8 @@ fn exercise<const D: u32, const L: usize>(model: &Model, payload: &[u8], output_
     let mut restored = vec![0; input.len()];
     decode_interleaved_into::<D, L>(model, &storage[range.clone()], &mut restored).unwrap();
     assert_eq!(input, restored);
-    if L == 1 {
-        decode_lookahead_into::<D>(model, &storage[range], &mut restored).unwrap();
-        assert_eq!(input, restored);
-    }
+    decode_lookahead_interleaved_into::<D, L>(model, &storage[range], &mut restored).unwrap();
+    assert_eq!(input, restored);
 }
 
 fuzz_target!(|data: &[u8]| {

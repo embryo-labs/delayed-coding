@@ -62,6 +62,7 @@ struct Delayed {
     uint32_t delay;
     uint32_t lanes;
     bool lookahead = false;
+    bool grouped = false;
     Delayed(const Model& m, size_t n, uint32_t d, uint32_t flags = 0, uint32_t l = 1)
         : buffer(n * 2), delay(d), lanes(l) {
         require(dc_model_new_with_options(m.frequencies.data(), 256, flags, &model) == DC_OK);
@@ -73,9 +74,12 @@ struct Delayed {
                           workspace, &offset, &size) == DC_OK);
     }
     void decode(std::vector<uint32_t>& output) {
+        if (grouped) {
+            require(dc_decode_grouped4(model, delay, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
+            return;
+        }
         if (lookahead) {
-            require(lanes == 1);
-            require(dc_decode_lookahead(model, delay, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
+            require(dc_decode_lookahead_interleaved(model, delay, lanes, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
             return;
         }
         require(dc_decode_interleaved(model, delay, lanes, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
@@ -192,6 +196,10 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     Delayed d4(model, count, 24, 0, 4), d4e(model, count, 24, 1, 4), d4b(model, count, 24, 3, 4);
     Delayed ahead(model, count, 24), ahead_direct(model, count, 24, 2);
     ahead.lookahead = ahead_direct.lookahead = true;
+    Delayed ahead4(model, count, 24, 0, 4), ahead4_direct(model, count, 24, 2, 4);
+    ahead4.lookahead = ahead4_direct.lookahead = true;
+    Delayed grouped4(model, count, 24, 0, 4), grouped4_direct(model, count, 24, 2, 4);
+    grouped4.grouped = grouped4_direct.grouped = true;
     Rans<1, false> b1(model, count);
     Rans<4, false> b4(model, count);
     Rans<1, true> w1(model, count);
@@ -215,6 +223,10 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     measure(distribution, "delayed24_4_direct_both", d4b, input);
     measure(distribution, "delayed24_lookahead", ahead, input);
     measure(distribution, "delayed24_lookahead_direct", ahead_direct, input);
+    measure(distribution, "delayed24_4_lookahead", ahead4, input);
+    measure(distribution, "delayed24_4_lookahead_direct", ahead4_direct, input);
+    measure(distribution, "delayed24_4_grouped", grouped4, input);
+    measure(distribution, "delayed24_4_grouped_direct", grouped4_direct, input);
     measure(distribution, "rans_byte_1", b1, input);
     measure(distribution, "rans_byte_4", b4, input);
     measure(distribution, "rans64_1", w1, input);
@@ -308,12 +320,19 @@ int main(int argc, char** argv) {
             std::cout << "record_symbols,records,codec,payload_bytes,index_bytes,total_bytes,mean_payload_bytes\n";
             for (size_t width : {8, 16, 32, 64, 256, 4096}) {
                 Delayed d16(model, width, 16), d24(model, width, 24);
+                Delayed d16x4(model, width, 16, 0, 4), d24x4(model, width, 24, 0, 4);
                 Rans<1, false> byte(model, width);
                 Rans<1, true> word(model, width);
+                Rans<4, false> byte4(model, width);
+                Rans<4, true> word4(model, width);
                 record_sizes("delayed16", d16, input, width);
                 record_sizes("delayed24", d24, input, width);
                 record_sizes("rans_byte_1", byte, input, width);
                 record_sizes("rans64_1", word, input, width);
+                record_sizes("delayed16_4", d16x4, input, width);
+                record_sizes("delayed24_4", d24x4, input, width);
+                record_sizes("rans_byte_4", byte4, input, width);
+                record_sizes("rans64_4", word4, input, width);
             }
             return 0;
         }

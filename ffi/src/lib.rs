@@ -1,10 +1,13 @@
 //! C ABI boundary. The codec itself forbids unsafe code. See include/delayed_coding.h.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use delayed_coding::decode_grouped4_into;
+use delayed_coding::decode_lookahead_interleaved_into;
 use delayed_coding::{decode_interleaved_into, encode_interleaved_into};
 use delayed_coding::{
     decode_into, decode_lookahead_into, encode_into, Error, Model, TableOptions, Workspace,
 };
+use delayed_coding::{encode_branches_into, Branch, Interval};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 #[repr(C)]
@@ -52,6 +55,113 @@ fn valid_slice<T>(pointer: *const T, length: usize) -> bool {
         || (!pointer.is_null()
             && (pointer as usize).is_multiple_of(std::mem::align_of::<T>())
             && length <= isize::MAX as usize / std::mem::size_of::<T>())
+}
+
+/// # Safety
+/// Intervals describes count readable, aligned entries. Out is writable, aligned
+/// and disjoint. The mapping is copied; input can be released on return.
+#[no_mangle]
+pub unsafe extern "C" fn dc_branch_new(
+    intervals: *const Interval,
+    count: usize,
+    frequency: u32,
+    out: *mut *mut Branch,
+) -> DcStatus {
+    guard(|| {
+        if !valid_slice(intervals, count) || !valid_slice(out, 1) {
+            return Err(DcStatus::InvalidArgument);
+        }
+        unsafe {
+            *out = std::ptr::null_mut();
+        }
+        let intervals = if count == 0 {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(intervals, count) }
+        };
+        let branch = Branch::new(intervals).map_err(DcStatus::from)?;
+        if branch.frequency() != frequency {
+            return Err(DcStatus::InvalidModel);
+        }
+        unsafe {
+            *out = Box::into_raw(Box::new(branch));
+        }
+        Ok(())
+    })
+}
+
+/// # Safety
+/// Branch must be null or an unreleased handle returned by dc_branch_new, with no live users.
+#[no_mangle]
+pub unsafe extern "C" fn dc_branch_free(branch: *mut Branch) {
+    if !branch.is_null() {
+        unsafe {
+            drop(Box::from_raw(branch));
+        }
+    }
+}
+
+/// # Safety
+/// Branches is an array of count live immutable branch handles. Workspace is
+/// exclusively borrowed. Output is writable and disjoint from inputs/handles;
+/// offset/size are writable, aligned and disjoint from each other and all buffers.
+/// Every borrowed allocation/handle remains valid and immutable for the call.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn dc_encode_branches(
+    branches: *const *const Branch,
+    count: usize,
+    delay: u32,
+    lanes: u32,
+    output: *mut u8,
+    capacity: usize,
+    workspace: *mut Workspace,
+    offset: *mut usize,
+    size: *mut usize,
+) -> DcStatus {
+    guard(|| {
+        if !valid_slice(branches, count)
+            || !valid_slice(output, capacity)
+            || !valid_slice(workspace, 1)
+            || !valid_slice(offset, 1)
+            || !valid_slice(size, 1)
+        {
+            return Err(DcStatus::InvalidArgument);
+        }
+        let handles = if count == 0 {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(branches, count) }
+        };
+        if handles.iter().any(|&p| !valid_slice(p, 1)) {
+            return Err(DcStatus::InvalidArgument);
+        }
+        let branches = handles.iter().map(|&p| unsafe { &*p });
+        let output = if capacity == 0 {
+            &mut []
+        } else {
+            unsafe { std::slice::from_raw_parts_mut(output, capacity) }
+        };
+        let workspace = unsafe { &mut *workspace };
+        if !matches!(lanes, 1 | 4) {
+            return Err(DcStatus::InvalidArgument);
+        }
+        let range = match (delay, lanes) {
+            (16, 1) => encode_branches_into::<16, 1>(branches, output, workspace),
+            (24, 1) => encode_branches_into::<24, 1>(branches, output, workspace),
+            (32, 1) => encode_branches_into::<32, 1>(branches, output, workspace),
+            (16, 4) => encode_branches_into::<16, 4>(branches, output, workspace),
+            (24, 4) => encode_branches_into::<24, 4>(branches, output, workspace),
+            (32, 4) => encode_branches_into::<32, 4>(branches, output, workspace),
+            _ => return Err(DcStatus::InvalidDelay),
+        }
+        .map_err(DcStatus::from)?;
+        unsafe {
+            *offset = range.start;
+            *size = range.len();
+        }
+        Ok(())
+    })
 }
 
 /// # Safety
@@ -245,7 +355,7 @@ pub unsafe extern "C" fn dc_decode_interleaved(
     output: *mut u32,
     count: usize,
 ) -> DcStatus {
-    unsafe { decode_dispatch(model, delay, lanes, input, size, output, count, false) }
+    unsafe { decode_dispatch(model, delay, lanes, input, size, output, count, 0) }
 }
 
 /// # Safety
@@ -259,7 +369,36 @@ pub unsafe extern "C" fn dc_decode_lookahead(
     output: *mut u32,
     count: usize,
 ) -> DcStatus {
-    unsafe { decode_dispatch(model, delay, 1, input, size, output, count, true) }
+    unsafe { decode_dispatch(model, delay, 1, input, size, output, count, 1) }
+}
+
+/// # Safety
+/// Same pointer contract as dc_decode_interleaved. Lanes must be 1 or 4.
+#[no_mangle]
+pub unsafe extern "C" fn dc_decode_lookahead_interleaved(
+    model: *const Model,
+    delay: u32,
+    lanes: u32,
+    input: *const u8,
+    size: usize,
+    output: *mut u32,
+    count: usize,
+) -> DcStatus {
+    unsafe { decode_dispatch(model, delay, lanes, input, size, output, count, 1) }
+}
+
+/// # Safety
+/// Same pointer contract as dc_decode_interleaved, with exactly four states.
+#[no_mangle]
+pub unsafe extern "C" fn dc_decode_grouped4(
+    model: *const Model,
+    delay: u32,
+    input: *const u8,
+    size: usize,
+    output: *mut u32,
+    count: usize,
+) -> DcStatus {
+    unsafe { decode_dispatch(model, delay, 4, input, size, output, count, 2) }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -271,7 +410,7 @@ unsafe fn decode_dispatch(
     size: usize,
     output: *mut u32,
     count: usize,
-    lookahead: bool,
+    mode: u8,
 ) -> DcStatus {
     guard(|| {
         if model.is_null() || !valid_slice(input, size) || !valid_slice(output, count) {
@@ -291,11 +430,23 @@ unsafe fn decode_dispatch(
         if !matches!(lanes, 1 | 4) {
             return Err(DcStatus::InvalidArgument);
         }
-        if lookahead {
+        if mode == 2 {
             return match delay {
-                16 => decode_lookahead_into::<16>(model, input, output),
-                24 => decode_lookahead_into::<24>(model, input, output),
-                32 => decode_lookahead_into::<32>(model, input, output),
+                16 => decode_grouped4_into::<16>(model, input, output),
+                24 => decode_grouped4_into::<24>(model, input, output),
+                32 => decode_grouped4_into::<32>(model, input, output),
+                _ => return Err(DcStatus::InvalidDelay),
+            }
+            .map_err(DcStatus::from);
+        }
+        if mode == 1 {
+            return match (delay, lanes) {
+                (16, 1) => decode_lookahead_into::<16>(model, input, output),
+                (24, 1) => decode_lookahead_into::<24>(model, input, output),
+                (32, 1) => decode_lookahead_into::<32>(model, input, output),
+                (16, 4) => decode_lookahead_interleaved_into::<16, 4>(model, input, output),
+                (24, 4) => decode_lookahead_interleaved_into::<24, 4>(model, input, output),
+                (32, 4) => decode_lookahead_interleaved_into::<32, 4>(model, input, output),
                 _ => return Err(DcStatus::InvalidDelay),
             }
             .map_err(DcStatus::from);

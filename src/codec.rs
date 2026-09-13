@@ -1,4 +1,4 @@
-use crate::{model::Symbol, Error, Layout, Model};
+use crate::{model::Symbol, Branch, Error, Layout, Model};
 use std::ops::Range;
 
 /// Models are borrowed for the duration of encoding; lifetimes prevent stale references.
@@ -42,18 +42,80 @@ fn validate_delay<const DELAY: u32>() -> Result<(), Error> {
 // Frequency 1 is handled separately. See docs/ALGORITHM.md for invariants.
 #[inline]
 pub(crate) fn quotient(n: u64, symbol: &Symbol) -> u64 {
+    quotient_frequency(n, symbol.frequency, symbol.reciprocal)
+}
+
+#[inline]
+pub(crate) fn quotient_frequency(n: u64, frequency: u32, reciprocal: u64) -> u64 {
     #[cfg(feature = "reference-division")]
     {
-        n / u64::from(symbol.frequency)
+        let _ = reciprocal;
+        n / u64::from(frequency)
     }
     #[cfg(not(feature = "reference-division"))]
     {
-        if symbol.frequency == 1 {
+        if frequency == 1 {
             n
         } else {
-            ((u128::from(n) * u128::from(symbol.reciprocal)) >> 64) as u64
+            ((u128::from(n) * u128::from(reciprocal)) >> 64) as u64
         }
     }
+}
+
+/// Encode an existing sequence of selected semantic-model branches. Unlike
+/// model-symbol events this preserves arbitrary disjoint interval mappings,
+/// including contiguous numerical/rare-value partitions and raw words.
+///
+/// The iterator must yield the same branches when cloned. A reusable workspace
+/// avoids per-block allocation; an iterator also lets the C ABI borrow its array
+/// of handles without allocating a temporary array of Rust references.
+/// Only 1/2/4/8 round-robin lanes and delay 16..32 are supported.
+pub fn encode_branches_into<'a, const DELAY: u32, const LANES: usize>(
+    branches: impl DoubleEndedIterator<Item = &'a Branch> + ExactSizeIterator + Clone,
+    output: &mut [u8],
+    workspace: &mut Workspace,
+) -> Result<Range<usize>, Error> {
+    let mut layout = Layout::<DELAY, LANES>::new()?;
+    let count = branches.len();
+    max_encoded_size(count)?;
+    workspace.virtual_symbols.resize(count, 0);
+    let mut seen = 0;
+    for branch in branches.clone() {
+        let flag = workspace
+            .virtual_symbols
+            .get_mut(seen)
+            .ok_or(Error::InvalidState)?;
+        *flag = u8::from(layout.push_frequency(branch.frequency())?.is_none());
+        seen += 1;
+    }
+    if seen != count {
+        return Err(Error::InvalidState);
+    }
+    if layout.encoded_len() > output.len() {
+        return Err(Error::OutputTooSmall);
+    }
+    let mut position = output.len();
+    let mut numerators = [0u64; LANES];
+    for branch in branches.rev() {
+        seen = seen.checked_sub(1).ok_or(Error::InvalidState)?;
+        let numerator = &mut numerators[seen & (LANES - 1)];
+        // Guard even an inconsistent user-supplied iterator in reference-division mode.
+        if *numerator >= 1u64 << 48 {
+            return Err(Error::InvalidState);
+        }
+        let (quotient, word) = branch.split(*numerator);
+        *numerator = quotient;
+        if workspace.virtual_symbols[seen] != 0 {
+            *numerator = (*numerator << 16) | u64::from(word);
+        } else {
+            position = position.checked_sub(2).ok_or(Error::OutputTooSmall)?;
+            output[position..position + 2].copy_from_slice(&word.to_be_bytes());
+        }
+    }
+    if seen != 0 {
+        return Err(Error::InvalidState);
+    }
+    Ok(position..output.len())
 }
 
 fn encode_impl<'a, const DELAY: u32, const LANES: usize>(
@@ -228,8 +290,48 @@ impl<'a, const DELAY: u32, const LANES: usize> Decoder<'a, DELAY, LANES> {
         })
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn read(&mut self, model: &Model) -> Result<u32, Error> {
+        self.read_mapped(|word| Ok(model.lookup(word)))
+    }
+
+    /// Read one of `count` contiguous equal-width intervals, preserving the
+    /// original numerical/rare-branch mapping. Rejects unused codeword tails.
+    #[inline]
+    pub fn read_uniform(&mut self, frequency: u32, count: u32) -> Result<u32, Error> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        if frequency == 0 || frequency > 65536 || count == 0 || count > 65536 / frequency {
+            self.error = Some(Error::InvalidModel);
+            return Err(Error::InvalidModel);
+        }
+        self.read_mapped(|word| {
+            let word = u32::from(word);
+            let symbol = word / frequency;
+            if symbol >= count {
+                return Err(Error::InvalidState);
+            }
+            Ok(crate::DecodedSymbol {
+                symbol,
+                frequency,
+                remainder: word - symbol * frequency,
+            })
+        })
+    }
+
+    /// A frequency-one operation; consumes a virtual word when present, without
+    /// allocating a 65536-symbol identity model. Participates in lane assignment.
+    #[inline]
+    pub fn read_raw(&mut self) -> Result<u16, Error> {
+        self.read_uniform(1, 65536).map(|word| word as u16)
+    }
+
+    #[inline(always)]
+    fn read_mapped(
+        &mut self,
+        lookup: impl FnOnce(u16) -> Result<crate::DecodedSymbol, Error>,
+    ) -> Result<u32, Error> {
         if let Some(error) = self.error {
             return Err(error);
         }
@@ -254,7 +356,13 @@ impl<'a, const DELAY: u32, const LANES: usize> Decoder<'a, DELAY, LANES> {
             self.position += 2;
             u16::from_be_bytes([bytes[0], bytes[1]])
         };
-        let decoded = model.lookup(word);
+        let decoded = match lookup(word) {
+            Ok(decoded) => decoded,
+            Err(error) => {
+                self.error = Some(error);
+                return Err(error);
+            }
+        };
         // Malformed payloads must not panic on integer overflow in Debug builds.
         // The valid-stream invariant is stronger; wrapping arithmetic here does
         // not make malformed streams trusted or guarantee corruption detection.
@@ -307,17 +415,38 @@ pub fn decode_lookahead_into<const DELAY: u32>(
     input: &[u8],
     output: &mut [u32],
 ) -> Result<(), Error> {
+    decode_lookahead_interleaved_into::<DELAY, 1>(model, input, output)
+}
+
+/// The fixed-model physical lookahead path with 1/2/4/8 independent states.
+/// One pending physical lookup is shared across lanes because the model is
+/// fixed; no assumptions are made about which lane consumes the next word.
+/// Uses the same bitstream as `decode_interleaved_into` for the same lane count.
+#[inline(never)]
+pub fn decode_lookahead_interleaved_into<const DELAY: u32, const LANES: usize>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+) -> Result<(), Error> {
     validate_delay::<DELAY>()?;
+    if !matches!(LANES, 1 | 2 | 4 | 8) {
+        return Err(Error::InvalidLanes);
+    }
     let mut physical = input
         .chunks_exact(2)
         .map(|bytes| model.lookup(u16::from_be_bytes([bytes[0], bytes[1]])));
     let mut pending = physical.next();
-    let (mut position, mut numerator, mut denominator) = (0usize, 0u64, 1u64);
-    for symbol in output {
-        let decoded = if denominator >= 1u64 << DELAY {
-            let decoded = model.lookup(numerator as u16);
-            numerator >>= 16;
-            denominator >>= 16;
+    let mut position = 0usize;
+    let mut states = [CodingState {
+        numerator: 0,
+        denominator: 1,
+    }; LANES];
+    for (i, symbol) in output.iter_mut().enumerate() {
+        let state = &mut states[i & (LANES - 1)];
+        let decoded = if state.denominator >= 1u64 << DELAY {
+            let decoded = model.lookup(state.numerator as u16);
+            state.numerator >>= 16;
+            state.denominator >>= 16;
             decoded
         } else {
             let decoded = pending.ok_or(Error::TruncatedInput)?;
@@ -325,21 +454,25 @@ pub fn decode_lookahead_into<const DELAY: u32>(
             position += 2;
             decoded
         };
-        numerator = numerator
+        state.numerator = state
+            .numerator
             .wrapping_mul(u64::from(decoded.frequency))
             .wrapping_add(u64::from(decoded.remainder));
-        denominator *= u64::from(decoded.frequency);
+        state.denominator *= u64::from(decoded.frequency);
         *symbol = decoded.symbol;
     }
     if position != input.len() {
         return Err(Error::TrailingInput);
     }
-    if numerator != 0 {
+    if states.iter().any(|state| state.numerator != 0) {
         return Err(Error::InvalidState);
     }
     Ok(())
 }
 
+// Isolate block-kernel optimization from growing C ABI dispatch switches. Inner
+// symbol operations remain inline; this boundary is crossed once per block.
+#[inline(never)]
 pub fn decode_interleaved_into<const DELAY: u32, const LANES: usize>(
     model: &Model,
     input: &[u8],
@@ -347,6 +480,66 @@ pub fn decode_interleaved_into<const DELAY: u32, const LANES: usize>(
 ) -> Result<(), Error> {
     let mut decoder = Decoder::<DELAY, LANES>::new(input)?;
     for symbol in output {
+        *symbol = decoder.read(model)?;
+    }
+    decoder.finish()
+}
+
+/// Experimental four-state kernel: plan a group's physical offsets from all
+/// four capacities before any symbol lookup. Same four-lane fixed-model format.
+/// This is an explicit alternative, not the default decoder.
+#[inline(never)]
+pub fn decode_grouped4_into<const DELAY: u32>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+) -> Result<(), Error> {
+    let mut decoder = Decoder::<DELAY, 4>::new(input)?;
+    let mut chunks = output.chunks_exact_mut(4);
+    for out in &mut chunks {
+        let physical = decoder
+            .states
+            .map(|s| usize::from(s.denominator < (1u64 << DELAY)));
+        let offsets = [
+            0,
+            physical[0],
+            physical[0] + physical[1],
+            physical[0] + physical[1] + physical[2],
+        ];
+        let count = offsets[3] + physical[3];
+        let Some(bytes) = input.get(decoder.position..decoder.position.saturating_add(count * 2))
+        else {
+            // Preserve serial partial-output/error semantics on a truncated group.
+            for symbol in out {
+                *symbol = decoder.read(model)?;
+            }
+            unreachable!();
+        };
+        let mut words = [0u16; 4];
+        for lane in 0..4 {
+            let state = &mut decoder.states[lane];
+            words[lane] = if physical[lane] != 0 {
+                u16::from_be_bytes([bytes[2 * offsets[lane]], bytes[2 * offsets[lane] + 1]])
+            } else {
+                let word = state.numerator as u16;
+                state.numerator >>= 16;
+                state.denominator >>= 16;
+                word
+            };
+        }
+        decoder.position += count * 2;
+        let decoded = words.map(|word| model.lookup(word));
+        for lane in 0..4 {
+            let state = &mut decoder.states[lane];
+            state.numerator = state
+                .numerator
+                .wrapping_mul(u64::from(decoded[lane].frequency))
+                .wrapping_add(u64::from(decoded[lane].remainder));
+            state.denominator *= u64::from(decoded[lane].frequency);
+            out[lane] = decoded[lane].symbol;
+        }
+    }
+    for symbol in chunks.into_remainder() {
         *symbol = decoder.read(model)?;
     }
     decoder.finish()

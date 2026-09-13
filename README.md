@@ -55,6 +55,9 @@ delayed-coding = { git = "https://github.com/YimingQiao/delayed-coding", rev = "
 - `encode_into`: caller-owned output and a reusable `Workspace`; returns the
   occupied range because the encoder writes backwards.
 - `encode_events_into` / `Decoder::read`: explicit per-symbol model selection.
+- `Branch` / `encode_branches_into`: import selected disjoint-interval branches
+  without changing a semantic model's mapping. `Decoder::read_uniform` and
+  `read_raw` handle numerical partitions/raw words without identity tables.
 - `encode_interleaved_into::<24, 4>` / `decode_interleaved_into::<24, 4>`: four
   round-robin states sharing one payload. Rust supports 1/2/4/8 states.
 - `Model::with_tables`: optional 128 KiB encode and/or 512 KiB decode tables.
@@ -66,6 +69,10 @@ delayed-coding = { git = "https://github.com/YimingQiao/delayed-coding", rev = "
 - `decode_lookahead_into::<24>` / C `dc_decode_lookahead`: opt-in, single-state
   fixed-model decoding with one physical word of lookahead. Same bytes and checks;
   no additional table/allocation. Not available for conditional model selection.
+- `decode_grouped4_into::<24>` / C `dc_decode_grouped4`: opt-in four-state
+  capacity-planned groups. Plan physical offsets before the group's lookups;
+  preserve the ordinary four-state bytes and error behavior. Interleaved physical
+  lookahead is also available, but can be slower. Neither replaces the default.
 
 The optional Cargo feature `flat-alias` experiments with branch-free alias
 addressing. It helps some fixed-model blocks but regresses measured conditional
@@ -87,10 +94,11 @@ ctest --test-dir build --output-on-failure
 
 See [the C example](examples/c_roundtrip.c) and [public header](include/delayed_coding.h).
 Downstream CMake projects can use `add_subdirectory` and link
-`DelayedCoding::delayed_coding`. The C ABI currently exposes fixed-model blocks,
-delay 16/24/32, and one/four states. Rust additionally exposes conditional models.
-This batch boundary avoids one FFI call per symbol; Blitzcrank's conditional C++
-models still need a separately measured adapter.
+`DelayedCoding::delayed_coding`. The C ABI exposes fixed-model blocks and mixed
+selected-branch encoding, delay 16/24/32, and one/four states. Rust additionally
+exposes stateful conditional decoding. The opt-in Blitzcrank encoder adapter uses
+one C call per block, including numerical/raw branches; its decoder is still C++.
+See [integration status and limits](docs/BLITZCRANK_INTEGRATION.md).
 
 ## Performance and validation
 
@@ -114,6 +122,11 @@ DC encoding remains slower. The record comparison includes equal offset indexes,
 but excludes shared model/framing bytes. This is not a whole-database result.
 Packed 512 KiB rANS decode-table adapters are explicitly labelled in the harness;
 they supplement, rather than replace, the unmodified-header baselines.
+
+The [four-state and real integration report](benchmarks/BLITZCRANK_FOUR_STATE.md)
+records a faster experimental DC group kernel, continued throughput losses to
+four-state rANS, and bit-identical Census encoding through the Rust bridge.
+Small-record four-state space wins are not yet a storage/latency application win.
 
 Tests cover exhaustive short binary strings, every 16-bit code point, random and
 conditional models, reciprocal-division boundaries, interleaving against independent

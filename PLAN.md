@@ -3,6 +3,11 @@
 Owner: YimingQiao. Started 2026-09-12. Expected scope: 2–3 days of engineering,
 with progress recorded here; this is not a claim of unattended scheduled execution.
 
+Research objective: a usable standalone library, efficiently called by Blitzcrank,
+and a real application with a defensible DC advantage over the best tested rANS
+configuration. Four states are available to both sides; do not force a scalar
+comparison or treat an alias implementation detail as the algorithmic contribution.
+
 ## Architecture
 
 `YimingQiao/delayed-coding` owns the standalone entropy coder, normalized models,
@@ -37,18 +42,19 @@ pass followed by a backward embedding pass.
 ### B — measured optimization (day 1–2)
 
 - [ ] Profile current loops and record baseline with CPU/compiler/commit metadata.
-- [ ] Compare exact reciprocal encoding against division; preserve reference oracle.
-- [ ] Compare compact alias and direct-table lookup, including many-model workloads.
-- [ ] Experiment with 2/4 independent states; compare like-for-like rANS configurations.
-- [ ] Report encoding/decoding, payload bits/symbol, table memory and setup cost together.
+- [x] Compare exact reciprocal encoding against division; preserve reference oracle.
+- [x] Compare compact alias and direct-table lookup, including many-model workloads.
+- [x] Experiment with independent states; benchmark four-state DC against four-state rANS.
+- [x] Report encoding/decoding, payload bits/symbol, table memory and setup cost together.
 - [ ] Retain only changes with evidence; never generalize a scalar win to SIMD rANS.
 
 ### C — integration and adoption (day 2–3)
 
 - [x] Thin block C interface and error contract; C caller example and test.
 - [x] Fuzz harness and corrupted/truncated payload tests; retain inputs if bugs are found.
-- [ ] Blitzcrank dependency adapter on an isolated branch; default research checkout untouched.
-- [ ] End-to-end table/record roundtrip and random-access checks after migration.
+- [x] Opt-in Blitzcrank encoder adapter on an isolated branch; research default untouched.
+- [x] Encoder bridge: Census table roundtrip and random seeks against legacy files.
+- [ ] Migrate and measure conditional record decoding; encoder-only is not full migration.
 - [ ] Format/compatibility policy; keep new container formats explicitly experimental.
 - [ ] Quickstart, algorithm walkthrough and candid benchmark report.
 - [ ] Tag a release only after acceptance checks; publicity text is draft only.
@@ -74,6 +80,38 @@ rANS matter; SIMD and alias variants remain mandatory before broad claims.
   `c9d162d996fd600315af9ae8eb89d832576cb32d`.
 
 ## Progress
+
+- 2026-09-13: exact selected-branch Rust/C encoding now supports original disjoint,
+  numerical and raw mappings, including four states. Blitzcrank's opt-in scalar
+  encoder calls this once per block, preserving historical files. 20,000 Census
+  records reconstruct exactly; payload/model/index bytes match legacy and 8,200
+  shuffled/boundary record seeks pass. The decoder remains C++.
+- Added capacity-planned four-state group decoding and interleaved lookahead.
+  Grouping improves DC compact-table book1 decoding from 6.53 to 4.44 ns/symbol;
+  its direct-table path is 4.11 versus rANS64 four-state 3.66. Keep both opt-in;
+  uniform data and four-state lookahead show losses. See
+  [full scope and raw experiments](benchmarks/BLITZCRANK_FOUR_STATE.md).
+
+## Next application milestone
+
+1. Compile semantic record operations into a reusable decode plan, keeping
+   conditional model selection inside a record-level Rust/C call. First support
+   categorical, equal-width and raw operations, then numerical tails. A per-field
+   FFI loop is a correctness reference, not the intended high-performance design.
+2. Add a same-semantics rANS backend using the same learned distributions and
+   independent records. Preserve the legacy format; introduce an explicit version
+   for new DC lane counts and rANS rather than silently reinterpreting files.
+3. Evaluate compressed in-memory record access: encode/update cost, random-read
+   median/p99 and scans versus total resident bytes (payload, indexes, models,
+   padding and workspaces). Sweep record length, model count and 1/2/4/8 states
+   for both algorithms; include applicable vectorized rANS controls.
+4. Select the storage/latency Pareto frontier, not only matched lane counts.
+   A candidate research target is 2x random-read throughput at comparable space,
+   or 20–30% less resident space at comparable p99. These are acceptance targets,
+   not achieved results or promises. If neither materializes, report it and
+   revisit the workload/algorithm rather than promoting a synthetic win.
+
+## Earlier progress
 
 - 2026-09-13: implemented frequency-only `Layout` offsets/length, exact-size
   allocating encoding, opt-in single-state physical lookahead (Rust/C), and an
@@ -102,7 +140,7 @@ rANS matter; SIMD and alias variants remain mandatory before broad claims.
   without a crash. Miri passed the C ABI ownership/buffer test (144 seconds).
   These are bounded checks, not a proof of memory safety or corruption detection.
 - Independent downstream CMake consumer passed; safety and downstream checks added to CI.
-- The [conditional C++ integration design](docs/BLITZCRANK_INTEGRATION.md) identifies
-  mixed alias/interval/raw-word requirements; a block-only link is not a migration.
-- Pending: continued loop optimization, broader comparisons, fuzzing, explicit
-  per-symbol/conditional C++ integration costs and end-to-end Blitzcrank migration.
+- The [conditional C++ integration status](docs/BLITZCRANK_INTEGRATION.md) tracks
+  mixed alias/interval/raw-word requirements and the implemented encoder bridge.
+- Pending: continued loop optimization, broader comparisons, deeper fuzzing,
+  record-level conditional decoding and full end-to-end Blitzcrank migration.

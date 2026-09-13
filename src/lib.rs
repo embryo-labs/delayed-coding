@@ -17,10 +17,15 @@
 //! ```
 #![forbid(unsafe_code)]
 
+mod branch;
 mod codec;
 mod layout;
 mod model;
 
+pub use branch::{Branch, Interval};
+pub use codec::decode_grouped4_into;
+pub use codec::decode_lookahead_interleaved_into;
+pub use codec::encode_branches_into;
 pub use codec::{decode_interleaved_into, encode_events_interleaved_into, encode_interleaved_into};
 pub use codec::{
     decode_into, decode_lookahead_into, encode, encode_events_into, encode_into, max_encoded_size,

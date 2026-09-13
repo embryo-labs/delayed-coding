@@ -2,6 +2,104 @@ use delayed_coding_ffi::*;
 use std::ptr::{null, null_mut};
 
 #[test]
+fn branch_handles_and_batch_encoding() {
+    unsafe {
+        let mut branch = null_mut();
+        let interval = delayed_coding::Interval {
+            start: 123,
+            end: 124,
+        };
+        assert_eq!(
+            dc_branch_new(&interval, 1, 2, &mut branch),
+            DcStatus::InvalidModel
+        );
+        assert!(branch.is_null());
+        assert_eq!(
+            dc_branch_new(null(), 1, 1, &mut branch),
+            DcStatus::InvalidArgument
+        );
+        assert_eq!(dc_branch_new(&interval, 1, 1, &mut branch), DcStatus::Ok);
+        let mut workspace = null_mut();
+        assert_eq!(dc_workspace_new(&mut workspace), DcStatus::Ok);
+        let handles = [branch.cast_const(); 17];
+        for delay in [16, 24, 32] {
+            for lanes in [1, 4] {
+                let mut output = [0xa5; 35];
+                let (mut offset, mut size) = (99, 99);
+                assert_eq!(
+                    dc_encode_branches(
+                        handles.as_ptr(),
+                        17,
+                        delay,
+                        lanes,
+                        output.as_mut_ptr(),
+                        output.len(),
+                        workspace,
+                        &mut offset,
+                        &mut size
+                    ),
+                    DcStatus::Ok
+                );
+                assert_eq!((offset, size), (1, 34));
+                assert_eq!(output[0], 0xa5);
+                assert!(output[1..].chunks_exact(2).all(|b| b == [0, 123]));
+                output.fill(0xa5);
+                assert_eq!(
+                    dc_encode_branches(
+                        handles.as_ptr(),
+                        17,
+                        delay,
+                        lanes,
+                        output.as_mut_ptr(),
+                        1,
+                        workspace,
+                        &mut offset,
+                        &mut size
+                    ),
+                    DcStatus::OutputTooSmall
+                );
+                assert_eq!(output, [0xa5; 35]);
+                assert_eq!((offset, size), (1, 34));
+                assert_eq!(
+                    dc_encode_branches(
+                        null(),
+                        0,
+                        delay,
+                        lanes,
+                        null_mut(),
+                        0,
+                        workspace,
+                        &mut offset,
+                        &mut size
+                    ),
+                    DcStatus::Ok
+                );
+                assert_eq!((offset, size), (0, 0));
+            }
+        }
+        let invalid = [null()];
+        let (mut offset, mut size) = (0, 0);
+        assert_eq!(
+            dc_encode_branches(
+                invalid.as_ptr(),
+                1,
+                24,
+                1,
+                null_mut(),
+                0,
+                workspace,
+                &mut offset,
+                &mut size
+            ),
+            DcStatus::InvalidArgument
+        );
+        dc_workspace_free(workspace);
+        dc_branch_free(branch);
+        dc_branch_free(null_mut());
+    }
+}
+
+#[test]
 fn owned_handles_and_bounded_buffers() {
     unsafe {
         let mut model = null_mut();
@@ -58,6 +156,33 @@ fn owned_handles_and_bounded_buffers() {
                         DcStatus::Ok
                     );
                     assert_eq!(restored, symbols);
+                    if lanes == 4 {
+                        assert_eq!(
+                            dc_decode_lookahead_interleaved(
+                                model,
+                                delay,
+                                lanes,
+                                output.as_ptr().add(offset),
+                                size,
+                                restored.as_mut_ptr(),
+                                restored.len()
+                            ),
+                            DcStatus::Ok
+                        );
+                        assert_eq!(restored, symbols);
+                        assert_eq!(
+                            dc_decode_grouped4(
+                                model,
+                                delay,
+                                output.as_ptr().add(offset),
+                                size,
+                                restored.as_mut_ptr(),
+                                restored.len()
+                            ),
+                            DcStatus::Ok
+                        );
+                        assert_eq!(restored, symbols);
+                    }
                     if lanes == 1 {
                         restored.fill(99);
                         assert_eq!(

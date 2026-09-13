@@ -1,8 +1,41 @@
-# Blitzcrank integration design
+# Blitzcrank integration: implemented encoder and remaining decoder work
 
-Status: design for the next implementation milestone, not an implemented runtime
-migration. Reference: Blitzcrank `0ed9c97908c51440b30a2eef3c1b90325dd2c87c`.
+Status: opt-in runtime **encoder** integration implemented on
+`improve-delayed-coding`; conditional Rust decoder migration is pending.
+Reference: Blitzcrank `0ed9c97908c51440b30a2eef3c1b90325dd2c87c`.
 The integration worktree is isolated from the owner's modified research checkout.
+
+## Working encoder boundary
+
+`Branch` imports an existing branch's ordered, disjoint half-open intervals. It
+owns the mapping and precomputes the reciprocal. Single intervals are inline;
+raw words do not allocate a 65,536-symbol identity model. `dc_branch_new` also
+checks the expected frequency against the sum of interval lengths.
+
+`dc_encode_branches` borrows an array of immutable branch handles for one block.
+The caller retains the models; a reusable workspace holds the virtual schedule.
+No temporary Rust reference array or per-symbol C call is needed. Rust supports
+1/2/4/8 states and the C boundary supports 1/4 at delays 16/24/32.
+
+The Blitzcrank flag `BLITZCRANK_RUST_ENCODER=ON` selects this encoder, with an
+explicit locally supplied dependency pinned by its CMake configuration. Semantic
+model branches are imported after construction; simple branch-pool entries are
+imported on first use. Each compressor owns its workspace and reusable buffers.
+Encoding remains **one state at the historical delay**, followed by a byte-to-u16
+compatibility copy into `BitString`. C++ decoding and the stored format are retained.
+
+This first bridge is not zero-copy or memory-neutral: each C++ Branch gains a
+shared handle and a copied immutable Rust mapping; a block gathers handle pointers
+and converts payload words. Mappings must not be mutated after import without
+clearing their cached handles. Lazy initialization is not a new thread-safe model
+construction API; prepare models before sharing across concurrent encoders.
+
+Tests include mixed branch byte equality against unmodified original C++, plus
+20,000 real Census rows (69 fields), two block thresholds, exact reconstruction,
+identical payload/model/index files and 8,200 shuffled/boundary record seeks.
+This covers the Census tabular bridge, not all JSON/time-series workloads. The
+[measured report](../benchmarks/BLITZCRANK_FOUR_STATE.md) includes bridge overhead
+and a small C++ decode regression; this is not a completed high-performance migration.
 
 ## Why linking the block API is insufficient
 
@@ -27,7 +60,12 @@ adapter must preserve this behavior, especially when a pending virtual word is
 consumed. Rebuilding every interval as an alias model can change word ordering;
 it is not a bit-exact migration strategy.
 
-## Implementation sequence
+## Decoder follow-through
+
+The following is the original sequence, with steps 1, 2 and 4 implemented in
+Rust/tests and the encoding portions of 3, 5 and 6 implemented. Opaque stateful
+C decoder handles/record plans, full numerical/JSON validation and replacement of
+the C++ decoder are still pending.
 
 1. Add a safe contiguous-interval encoding event alongside existing model events.
    Validate nonzero frequency and `start + frequency <= 65536`; avoid constructing
