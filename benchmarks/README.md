@@ -137,3 +137,31 @@ capacity-planned DC decoding; `--records` includes one- and four-state size rows
 for both families. See [the experiment report](BLITZCRANK_FOUR_STATE.md) for
 canonical results, intermediate regressions and the real Census encoder bridge.
 The bridge benchmark compares Rust DC to original C++ DC, **not** to rANS.
+
+## Branchless speed paths and profiling
+
+See [SPEED_KERNELS](SPEED_KERNELS.md) for the next optimized kernels, negative
+ablations and their limits. Default builds expose branchless four-state decoding
+as a separate API. To test optional speculative multi-lane encoding:
+
+```sh
+cmake -S . -B build-speed -DCMAKE_BUILD_TYPE=Release \
+  -DDELAYED_CODING_RANS_DIR=/tmp/ryg_rans \
+  -DDELAYED_CODING_SPECULATIVE_ENCODE=ON \
+  -DDELAYED_CODING_BUILD_SIMD_BENCHMARK=ON
+cmake --build build-speed -j
+ctest --test-dir build-speed --output-on-failure
+DC_BENCH_MIN_SYMBOLS=4194304 taskset -c 2 build-speed/compare_rans --file /tmp/ryg_rans/book1
+```
+
+For focused profiling, `DC_BENCH_CODEC` selects an exact codec row name and
+`DC_BENCH_MIN_SYMBOLS` overrides the default sample-work target (1..2^30).
+Actual repeats remain `max(1, target / block_length)`, rounded down. Seven median
+samples are retained. `--check` ignores the codec filter and validates all codecs.
+Environment settings are printed to stderr and must accompany recorded results.
+
+```sh
+DC_BENCH_CODEC=delayed24_4_branchless_both DC_BENCH_MIN_SYMBOLS=16777216 \
+  perf record -o /tmp/dc-profile.data -- taskset -c 2 build-speed/compare_rans --file /tmp/ryg_rans/book1
+perf report --stdio -i /tmp/dc-profile.data
+```

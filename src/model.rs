@@ -315,6 +315,12 @@ impl Model {
         }
     }
 
+    pub(crate) fn direct_decode_table(&self) -> Option<&[u64; 65536]> {
+        self.decode_table
+            .as_deref()
+            .map(|table| table.try_into().expect("complete decode table"))
+    }
+
     /// Inverse of lookup, useful for testing and custom coding integrations.
     pub fn embed(&self, symbol: u32, remainder: u32) -> Result<u16, Error> {
         let s = self

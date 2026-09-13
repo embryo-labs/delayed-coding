@@ -47,18 +47,29 @@ impl<const DELAY: u32, const LANES: usize> Layout<DELAY, LANES> {
         if !(1..=65536).contains(&frequency) {
             return Err(Error::InvalidModel);
         }
+        if self.capacities[self.lane] < 1u64 << DELAY {
+            self.bytes.checked_add(2).ok_or(Error::InputTooLarge)?;
+        }
+        Ok(self.push_validated(frequency))
+    }
+
+    /// Internal encoder path: the immutable model validated frequency, and the
+    /// block's checked 2*count bound guarantees that byte accounting fits usize.
+    #[inline(always)]
+    pub(crate) fn push_validated(&mut self, frequency: u32) -> Option<usize> {
+        debug_assert!((1..=65536).contains(&frequency));
         let mut capacity = self.capacities[self.lane];
         let offset = if capacity >= 1u64 << DELAY {
             capacity >>= 16;
             None
         } else {
             let offset = self.bytes;
-            self.bytes = self.bytes.checked_add(2).ok_or(Error::InputTooLarge)?;
+            self.bytes += 2;
             Some(offset)
         };
         self.capacities[self.lane] = capacity * u64::from(frequency);
         self.lane = (self.lane + 1) & (LANES - 1);
-        Ok(offset)
+        offset
     }
 
     /// Exact bytes for the observed prefix encoded as a standalone block.

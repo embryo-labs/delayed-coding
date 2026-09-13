@@ -1,6 +1,7 @@
 //! C ABI boundary. The codec itself forbids unsafe code. See include/delayed_coding.h.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use delayed_coding::decode_branchless4_into;
 use delayed_coding::decode_grouped4_into;
 use delayed_coding::decode_lookahead_interleaved_into;
 use delayed_coding::{decode_interleaved_into, encode_interleaved_into};
@@ -401,6 +402,21 @@ pub unsafe extern "C" fn dc_decode_grouped4(
     unsafe { decode_dispatch(model, delay, 4, input, size, output, count, 2) }
 }
 
+/// # Safety
+/// Same pointer contract as dc_decode_interleaved, with exactly four states.
+/// No padding beyond the specified input slice is required.
+#[no_mangle]
+pub unsafe extern "C" fn dc_decode_branchless4(
+    model: *const Model,
+    delay: u32,
+    input: *const u8,
+    size: usize,
+    output: *mut u32,
+    count: usize,
+) -> DcStatus {
+    unsafe { decode_dispatch(model, delay, 4, input, size, output, count, 3) }
+}
+
 #[allow(clippy::too_many_arguments)]
 unsafe fn decode_dispatch(
     model: *const Model,
@@ -429,6 +445,15 @@ unsafe fn decode_dispatch(
         };
         if !matches!(lanes, 1 | 4) {
             return Err(DcStatus::InvalidArgument);
+        }
+        if mode == 3 {
+            return match delay {
+                16 => decode_branchless4_into::<16>(model, input, output),
+                24 => decode_branchless4_into::<24>(model, input, output),
+                32 => decode_branchless4_into::<32>(model, input, output),
+                _ => return Err(DcStatus::InvalidDelay),
+            }
+            .map_err(DcStatus::from);
         }
         if mode == 2 {
             return match delay {

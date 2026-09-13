@@ -73,11 +73,31 @@ delayed-coding = { git = "https://github.com/YimingQiao/delayed-coding", rev = "
   capacity-planned groups. Plan physical offsets before the group's lookups;
   preserve the ordinary four-state bytes and error behavior. Interleaved physical
   lookahead is also available, but can be slower. Neither replaces the default.
+- `decode_branchless4_into::<24>` / C `dc_decode_branchless4`: opt-in four-state
+  source selection with masks and bounded eight-byte windows. No input padding;
+  scalar reads handle the tail. Particularly useful to test on nonuniform blocks.
 
 The optional Cargo feature `flat-alias` experiments with branch-free alias
 addressing. It helps some fixed-model blocks but regresses measured conditional
 model switching, so it is disabled by default. See the benchmark report before
 enabling it; it does not change payload bytes.
+
+The optional `speculative-encode` feature removes the physical/virtual store
+branch in the model/event encoder for 4/8 states. Single-state and selected-branch
+encoding retain their existing embedding loop. Writes remain inside the final
+payload range, even with exact capacity. Predictable distributions can regress,
+so the feature is off by default. See [speed experiments](benchmarks/SPEED_KERNELS.md).
+
+Try the explicit fixed-model speed path with reusable buffers and direct tables:
+
+```sh
+cargo run --release --features speculative-encode --example fast_block
+# Or add: -- /path/to/byte/file
+```
+
+This example uses four states, 128 KiB of extra encoding tables and 512 KiB of
+extra decoding tables. It is not an automatic best choice for short records,
+many conditional models or uniform data.
 
 The core forbids unsafe code. Models are immutable and shareable; each encoder
 owns its workspace and each decoder owns its state. The encoder still needs a

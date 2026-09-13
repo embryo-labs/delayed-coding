@@ -7,6 +7,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -18,6 +19,9 @@
 using Clock = std::chrono::steady_clock;
 static volatile uint64_t checksum = 0;
 static bool validate_only = false;
+static std::string codec_filter;
+static size_t minimum_symbols = 262144;
+static size_t measured_codecs = 0;
 #ifdef DELAYED_CODING_HAVE_RANS_SIMD
 static constexpr uint32_t probability_scale = 4096;
 #else
@@ -63,6 +67,7 @@ struct Delayed {
     uint32_t lanes;
     bool lookahead = false;
     bool grouped = false;
+    bool branchless = false;
     Delayed(const Model& m, size_t n, uint32_t d, uint32_t flags = 0, uint32_t l = 1)
         : buffer(n * 2), delay(d), lanes(l) {
         require(dc_model_new_with_options(m.frequencies.data(), 256, flags, &model) == DC_OK);
@@ -74,6 +79,10 @@ struct Delayed {
                           workspace, &offset, &size) == DC_OK);
     }
     void decode(std::vector<uint32_t>& output) {
+        if (branchless) {
+            require(dc_decode_branchless4(model, delay, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
+            return;
+        }
         if (grouped) {
             require(dc_decode_grouped4(model, delay, buffer.data() + offset, size, output.data(), output.size()) == DC_OK);
             return;
@@ -175,11 +184,14 @@ double median_ns(size_t repeats, Function run) {
 template<class Codec>
 void measure(const std::string& distribution, const std::string& name, Codec& codec,
              const std::vector<uint32_t>& input) {
+    // Validation mode always checks every codec, regardless of profiling filters.
+    if (!validate_only && !codec_filter.empty() && name != codec_filter) return;
     std::vector<uint32_t> output(input.size());
     codec.encode(input); codec.decode(output); require(output == input);
     if (validate_only) return;
+    ++measured_codecs;
     const auto bytes = codec.bytes();
-    const size_t repeats = std::max<size_t>(1, 262144 / input.size());
+    const size_t repeats = std::max<size_t>(1, minimum_symbols / input.size());
     const double encode_ns = median_ns(repeats, [&] { codec.encode(input); checksum += codec.bytes(); });
     const double decode_ns = median_ns(repeats, [&] { codec.decode(output); checksum += output[input.size() / 2]; });
     require(output == input);
@@ -200,6 +212,10 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     ahead4.lookahead = ahead4_direct.lookahead = true;
     Delayed grouped4(model, count, 24, 0, 4), grouped4_direct(model, count, 24, 2, 4);
     grouped4.grouped = grouped4_direct.grouped = true;
+    Delayed branchless4(model, count, 24, 0, 4), branchless4_direct(model, count, 24, 2, 4);
+    branchless4.branchless = branchless4_direct.branchless = true;
+    Delayed branchless4_both(model, count, 24, 3, 4);
+    branchless4_both.branchless = true;
     Rans<1, false> b1(model, count);
     Rans<4, false> b4(model, count);
     Rans<1, true> w1(model, count);
@@ -227,6 +243,9 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     measure(distribution, "delayed24_4_lookahead_direct", ahead4_direct, input);
     measure(distribution, "delayed24_4_grouped", grouped4, input);
     measure(distribution, "delayed24_4_grouped_direct", grouped4_direct, input);
+    measure(distribution, "delayed24_4_branchless", branchless4, input);
+    measure(distribution, "delayed24_4_branchless_direct", branchless4_direct, input);
+    measure(distribution, "delayed24_4_branchless_both", branchless4_both, input);
     measure(distribution, "rans_byte_1", b1, input);
     measure(distribution, "rans_byte_4", b4, input);
     measure(distribution, "rans64_1", w1, input);
@@ -307,6 +326,17 @@ static void record_sizes(const char* name, Codec& codec, const std::vector<uint3
 
 int main(int argc, char** argv) {
     try {
+        if (const auto* filter = std::getenv("DC_BENCH_CODEC")) codec_filter = filter;
+        if (const auto* minimum = std::getenv("DC_BENCH_MIN_SYMBOLS")) {
+            const std::string value(minimum);
+            size_t end = 0;
+            const auto parsed = std::stoull(value, &end);
+            if (end != value.size() || parsed == 0 || parsed > (1u << 30))
+                throw std::invalid_argument("DC_BENCH_MIN_SYMBOLS must be 1..1073741824");
+            minimum_symbols = parsed;
+        }
+        if (!codec_filter.empty() || minimum_symbols != 262144)
+            std::cerr << "profiling: codec=" << codec_filter << " minimum_symbols=" << minimum_symbols << '\n';
 #ifdef DELAYED_CODING_HAVE_RANS_SIMD
         if (!__builtin_cpu_supports("sse4.1")) throw std::runtime_error("SSE4.1 CPU required");
         std::cerr << "12-bit probability suite: all weights scaled exactly to 16 bits for non-SIMD codecs\n";
@@ -370,6 +400,8 @@ int main(int argc, char** argv) {
                 benchmark_input(distribution + (probability_scale == 4096 ? "_p12" : ""), model, input);
             }
         }
+        if (!validate_only && !codec_filter.empty() && measured_codecs == 0)
+            throw std::invalid_argument("DC_BENCH_CODEC matched no codec");
         std::cerr << "validation checksum=" << checksum << '\n';
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

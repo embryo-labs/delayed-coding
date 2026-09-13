@@ -4,6 +4,63 @@ use delayed_coding::{
 };
 
 struct Random(u64);
+
+fn exact_interleaved<const D: u32, const L: usize>() {
+    for weights in [
+        vec![65536],
+        vec![1, 65535],
+        vec![32768, 32768],
+        vec![256; 256],
+    ] {
+        for direct in [false, true] {
+            let model = Model::new(&weights)
+                .unwrap()
+                .with_tables(delayed_coding::TableOptions {
+                    direct_encode: direct,
+                    direct_decode: false,
+                });
+            for n in [0, 1, 3, 4, 5, 7, 8, 9, 17, 4097] {
+                let symbols: Vec<_> = (0..n)
+                    .map(|i| model.lookup((i * 1337) as u16).symbol)
+                    .collect();
+                let mut workspace = Workspace::default();
+                let mut worst = vec![0xa5; n * 2 + 3];
+                let range = delayed_coding::encode_interleaved_into::<D, L>(
+                    &model,
+                    &symbols,
+                    &mut worst,
+                    &mut workspace,
+                )
+                .unwrap();
+                assert!(worst[..range.start].iter().all(|&b| b == 0xa5));
+                let mut exact = vec![0; range.len()];
+                let exact_range = delayed_coding::encode_interleaved_into::<D, L>(
+                    &model,
+                    &symbols,
+                    &mut exact,
+                    &mut workspace,
+                )
+                .unwrap();
+                assert_eq!(exact_range.start, 0);
+                assert_eq!(&worst[range], exact);
+                let mut restored = vec![99; n];
+                delayed_coding::decode_interleaved_into::<D, L>(&model, &exact, &mut restored)
+                    .unwrap();
+                assert_eq!(symbols, restored);
+            }
+        }
+    }
+}
+
+#[test]
+fn interleaved_exact_capacity_and_untouched_prefix() {
+    exact_interleaved::<16, 4>();
+    exact_interleaved::<24, 4>();
+    exact_interleaved::<32, 4>();
+    exact_interleaved::<16, 8>();
+    exact_interleaved::<24, 8>();
+    exact_interleaved::<32, 8>();
+}
 impl Random {
     fn next(&mut self) -> u32 {
         self.0 ^= self.0 << 13;

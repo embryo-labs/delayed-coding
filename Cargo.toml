@@ -22,6 +22,8 @@ default = []
 reference-division = []
 # Experimental fixed-model tradeoff; regresses some conditional/many-model loops.
 flat-alias = []
+# Experimental multi-lane encoder; can regress predictable distributions.
+speculative-encode = []
 
 [[bench]]
 name = "throughput"

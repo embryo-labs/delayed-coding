@@ -208,6 +208,8 @@ fn interleaved_differential<const D: u32, const L: usize>() {
         if L == 4 {
             delayed_coding::decode_grouped4_into::<D>(&model, payload, &mut output).unwrap();
             assert_eq!(symbols, output);
+            delayed_coding::decode_branchless4_into::<D>(&model, payload, &mut output).unwrap();
+            assert_eq!(symbols, output);
         }
         for cut in 0..payload.len().min(64) {
             let mut a = vec![99; n];
@@ -223,6 +225,12 @@ fn interleaved_differential<const D: u32, const L: usize>() {
                 assert_eq!(
                     decode_interleaved_into::<D, L>(&model, &payload[..cut], &mut c),
                     delayed_coding::decode_grouped4_into::<D>(&model, &payload[..cut], &mut d)
+                );
+                assert_eq!(c, d);
+                d.fill(99);
+                assert_eq!(
+                    decode_interleaved_into::<D, L>(&model, &payload[..cut], &mut c),
+                    delayed_coding::decode_branchless4_into::<D>(&model, &payload[..cut], &mut d)
                 );
                 assert_eq!(c, d);
             }
@@ -245,6 +253,13 @@ fn interleaved_differential<const D: u32, const L: usize>() {
                 delayed_coding::decode_grouped4_into::<D>(&model, &bytes, &mut d)
             );
             assert_eq!(c, d);
+            c.fill(99);
+            d.fill(99);
+            assert_eq!(
+                decode_interleaved_into::<D, L>(&model, &bytes, &mut c),
+                delayed_coding::decode_branchless4_into::<D>(&model, &bytes, &mut d)
+            );
+            assert_eq!(c, d);
         }
     }
 }
@@ -256,4 +271,62 @@ fn interleaved_lookahead_matches_serial() {
     interleaved_differential::<32, 4>();
     interleaved_differential::<24, 2>();
     interleaved_differential::<24, 8>();
+}
+
+fn all_masks<const D: u32>() {
+    for direct in [false, true] {
+        let model = Model::new(&[1, 4095, 8192, 16384, 36864])
+            .unwrap()
+            .with_tables(delayed_coding::TableOptions {
+                direct_encode: false,
+                direct_decode: direct,
+            });
+        for mask in 0..16 {
+            let mut symbols = Vec::new();
+            for _ in 0..3 {
+                for lane in 0..4 {
+                    symbols.push(if mask & (1 << lane) != 0 { 4 } else { 0 });
+                }
+            }
+            // Every lane has crossed/not crossed the threshold according to mask;
+            // leave enough physical words to exercise the fast eight-byte window.
+            symbols.extend([0; 68]);
+            let mut storage = vec![0; symbols.len() * 2];
+            let range = delayed_coding::encode_interleaved_into::<D, 4>(
+                &model,
+                &symbols,
+                &mut storage,
+                &mut Workspace::default(),
+            )
+            .unwrap();
+            let payload = &storage[range];
+            for cut in 0..=payload.len() {
+                for n in [0, 1, 3, 4, 5, 12, 15, 16, 17, symbols.len()] {
+                    let mut ordinary = vec![u32::MAX; n];
+                    let mut optimized = ordinary.clone();
+                    assert_eq!(
+                        delayed_coding::decode_interleaved_into::<D, 4>(
+                            &model,
+                            &payload[..cut],
+                            &mut ordinary
+                        ),
+                        delayed_coding::decode_branchless4_into::<D>(
+                            &model,
+                            &payload[..cut],
+                            &mut optimized
+                        ),
+                        "D={D}, direct={direct}, mask={mask}, cut={cut}, n={n}"
+                    );
+                    assert_eq!(ordinary, optimized);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn branchless_all_source_masks_and_exact_input_tails() {
+    all_masks::<16>();
+    all_masks::<24>();
+    all_masks::<32>();
 }

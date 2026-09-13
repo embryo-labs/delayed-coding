@@ -21,6 +21,12 @@ fn exercise<const D: u32, const L: usize>(model: &Model, payload: &[u8], output_
             delayed_coding::decode_grouped4_into::<D>(model, payload, &mut grouped)
         );
         assert_eq!(output, grouped);
+        grouped.fill(0);
+        assert_eq!(
+            result,
+            delayed_coding::decode_branchless4_into::<D>(model, payload, &mut grouped)
+        );
+        assert_eq!(output, grouped);
     }
     let input: Vec<_> = payload
         .iter()

@@ -183,6 +183,21 @@ fn owned_handles_and_bounded_buffers() {
                         );
                         assert_eq!(restored, symbols);
                     }
+                    if lanes == 4 {
+                        restored.fill(99);
+                        assert_eq!(
+                            dc_decode_branchless4(
+                                model,
+                                delay,
+                                output.as_ptr().add(offset),
+                                size,
+                                restored.as_mut_ptr(),
+                                restored.len()
+                            ),
+                            DcStatus::Ok
+                        );
+                        assert_eq!(restored, symbols);
+                    }
                     if lanes == 1 {
                         restored.fill(99);
                         assert_eq!(

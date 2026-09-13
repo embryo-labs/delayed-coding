@@ -23,6 +23,7 @@ mod layout;
 mod model;
 
 pub use branch::{Branch, Interval};
+pub use codec::decode_branchless4_into;
 pub use codec::decode_grouped4_into;
 pub use codec::decode_lookahead_interleaved_into;
 pub use codec::encode_branches_into;

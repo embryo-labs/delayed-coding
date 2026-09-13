@@ -85,6 +85,36 @@ the valid-numerator invariant; the decoder uses explicit wrapping arithmetic and
 bounded input reads, avoiding Debug-only overflow panics. These checks are not an
 integrity guarantee.
 
+### Branchless four-state windows and speculative encoding
+
+The optional branchless decoder calculates four source flags and prefix offsets
+from the capacity states. If eight bytes remain, every possible physical source
+load is within that window, including loads whose values are discarded for
+virtual lanes. Bit masks select the real word and shift counts normalize each
+state without a data-dependent source branch. A separate scalar tail handles
+less than eight remaining bytes and non-multiple-of-four output sizes, including
+malformed inputs. No padded allocation or unchecked read is required. Table mode
+is selected once per block; an exact 65,536-entry array removes direct-lookup
+bounds checks without unsafe code. The ordinary grouped decoder remains available.
+
+The optional `speculative-encode` feature applies to 4/8-state model/event encoding.
+Before each reverse event it writes a word at `position-2` and advances position
+only for physical events. A virtual event's store will be replaced. Why is this
+safe even with an exactly sized output? Every lane's first event is physical,
+since its initial capacity is one. Every virtual event therefore has at least
+one earlier physical event in its lane that is still unwritten in reverse order.
+The speculative slot is inside the final payload, never before its start or
+after its end. Physical output order and final bytes are unchanged. This property
+is tested with empty/short blocks, long virtual runs and untouched output prefixes.
+
+Internal scheduling also uses a validated-frequency path: immutable model
+construction checked the frequency and a checked `2*count` bound protects total
+byte accounting. The public incremental `Layout::push_frequency` still checks
+each caller-supplied frequency and count overflow, with unchanged error semantics.
+
+Both optimizations trade branch mispredictions for more unconditional work. They
+are not uniformly faster; see the [measured report](../benchmarks/SPEED_KERNELS.md).
+
 ## Exact reciprocal division
 
 For f >= 2 precompute `c = ceil(2^64 / f)`. Then the high half of `n*c` is

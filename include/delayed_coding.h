@@ -73,6 +73,10 @@ DcStatus dc_decode_lookahead_interleaved(const DcModel* model, uint32_t delay, u
 /* Experimental capacity-planned four-state group. Same four-lane payload. */
 DcStatus dc_decode_grouped4(const DcModel* model, uint32_t delay,
     const uint8_t* input, size_t size, uint32_t* output, size_t count);
+/* Experimental branchless four-state source selection. No input padding required.
+ * Same payload/errors; workload dependent, not a replacement for every decoder. */
+DcStatus dc_decode_branchless4(const DcModel* model, uint32_t delay,
+    const uint8_t* input, size_t size, uint32_t* output, size_t count);
 
 /* Same contracts as above, with 1 or 4 round-robin coding states.
  * Lane count must be stored externally with delay/model/symbol count. */

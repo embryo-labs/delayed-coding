@@ -85,7 +85,7 @@ pub fn encode_branches_into<'a, const DELAY: u32, const LANES: usize>(
             .virtual_symbols
             .get_mut(seen)
             .ok_or(Error::InvalidState)?;
-        *flag = u8::from(layout.push_frequency(branch.frequency())?.is_none());
+        *flag = u8::from(layout.push_validated(branch.frequency()).is_none());
         seen += 1;
     }
     if seen != count {
@@ -149,7 +149,7 @@ fn schedule_impl<'a, const DELAY: u32, const LANES: usize>(
         if symbol.frequency == 0 {
             return Err(Error::InvalidSymbol);
         }
-        workspace.virtual_symbols[i] = u8::from(layout.push_frequency(symbol.frequency)?.is_none());
+        workspace.virtual_symbols[i] = u8::from(layout.push_validated(symbol.frequency).is_none());
     }
     Ok(layout.encoded_len())
 }
@@ -170,12 +170,23 @@ fn embed_impl<'a, const LANES: usize>(
         let q = quotient(*numerator, symbol);
         let remainder = (*numerator - q * u64::from(symbol.frequency)) as u32;
         let word = event.model.embed_validated(symbol, remainder);
-        *numerator = q;
-        if workspace.virtual_symbols[i] != 0 {
-            *numerator = (*numerator << 16) | u64::from(word);
+        if cfg!(feature = "speculative-encode") && LANES >= 4 {
+            let virtual_word = usize::from(workspace.virtual_symbols[i]);
+            // Every lane starts with a physical word. Thus while reversing, every
+            // virtual word still has an earlier physical slot to overwrite. This
+            // store stays inside the final occupied range even for exact capacity.
+            output[position - 2..position].copy_from_slice(&word.to_be_bytes());
+            position -= (1 - virtual_word) * 2;
+            *numerator = (q << (virtual_word * 16))
+                | (u64::from(word) & (virtual_word as u64).wrapping_neg());
         } else {
-            position -= 2;
-            output[position..position + 2].copy_from_slice(&word.to_be_bytes());
+            *numerator = q;
+            if workspace.virtual_symbols[i] != 0 {
+                *numerator = (*numerator << 16) | u64::from(word);
+            } else {
+                position -= 2;
+                output[position..position + 2].copy_from_slice(&word.to_be_bytes());
+            }
         }
     }
     position..output.len()
@@ -494,9 +505,54 @@ pub fn decode_grouped4_into<const DELAY: u32>(
     input: &[u8],
     output: &mut [u32],
 ) -> Result<(), Error> {
+    grouped4_impl::<DELAY, false>(model, input, output)
+}
+
+/// Experimental branchless four-state source selection. A bounded eight-byte
+/// window permits speculative word loads inside the payload, never outside it.
+/// No caller padding is needed; scalar bounded reads handle the entire tail.
+#[inline(never)]
+pub fn decode_branchless4_into<const DELAY: u32>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+) -> Result<(), Error> {
+    grouped4_impl::<DELAY, true>(model, input, output)
+}
+
+fn grouped4_impl<const DELAY: u32, const BRANCHLESS: bool>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+) -> Result<(), Error> {
+    if let Some(table) = model.direct_decode_table() {
+        grouped4_lookup::<DELAY, BRANCHLESS>(model, input, output, |word| {
+            let entry = table[usize::from(word)];
+            crate::DecodedSymbol {
+                symbol: ((entry >> 16) & 65535) as u32,
+                frequency: (entry >> 32) as u32 + 1,
+                remainder: (entry & 65535) as u32,
+            }
+        })
+    } else {
+        grouped4_lookup::<DELAY, BRANCHLESS>(model, input, output, |word| model.lookup(word))
+    }
+}
+
+#[inline(always)]
+fn grouped4_lookup<const DELAY: u32, const BRANCHLESS: bool>(
+    model: &Model,
+    input: &[u8],
+    output: &mut [u32],
+    lookup: impl Fn(u16) -> crate::DecodedSymbol,
+) -> Result<(), Error> {
     let mut decoder = Decoder::<DELAY, 4>::new(input)?;
-    let mut chunks = output.chunks_exact_mut(4);
-    for out in &mut chunks {
+    let mut completed = 0;
+    while completed + 4 <= output.len() {
+        if BRANCHLESS && input.len() - decoder.position < 8 {
+            break;
+        }
+        let out = &mut output[completed..completed + 4];
         let physical = decoder
             .states
             .map(|s| usize::from(s.denominator < (1u64 << DELAY)));
@@ -507,19 +563,25 @@ pub fn decode_grouped4_into<const DELAY: u32>(
             physical[0] + physical[1] + physical[2],
         ];
         let count = offsets[3] + physical[3];
-        let Some(bytes) = input.get(decoder.position..decoder.position.saturating_add(count * 2))
+        let bytes = if BRANCHLESS { 8 } else { count * 2 };
+        let Some(window) = input.get(decoder.position..decoder.position.saturating_add(bytes))
         else {
-            // Preserve serial partial-output/error semantics on a truncated group.
-            for symbol in out {
-                *symbol = decoder.read(model)?;
-            }
-            unreachable!();
+            break;
         };
         let mut words = [0u16; 4];
         for lane in 0..4 {
             let state = &mut decoder.states[lane];
-            words[lane] = if physical[lane] != 0 {
-                u16::from_be_bytes([bytes[2 * offsets[lane]], bytes[2 * offsets[lane] + 1]])
+            words[lane] = if BRANCHLESS {
+                let loaded =
+                    u16::from_be_bytes([window[2 * offsets[lane]], window[2 * offsets[lane] + 1]]);
+                let mask = (physical[lane] as u16).wrapping_neg();
+                let word = (loaded & mask) | (state.numerator as u16 & !mask);
+                let shift = (1 - physical[lane]) * 16;
+                state.numerator >>= shift;
+                state.denominator >>= shift;
+                word
+            } else if physical[lane] != 0 {
+                u16::from_be_bytes([window[2 * offsets[lane]], window[2 * offsets[lane] + 1]])
             } else {
                 let word = state.numerator as u16;
                 state.numerator >>= 16;
@@ -528,7 +590,7 @@ pub fn decode_grouped4_into<const DELAY: u32>(
             };
         }
         decoder.position += count * 2;
-        let decoded = words.map(|word| model.lookup(word));
+        let decoded = words.map(&lookup);
         for lane in 0..4 {
             let state = &mut decoder.states[lane];
             state.numerator = state
@@ -538,8 +600,9 @@ pub fn decode_grouped4_into<const DELAY: u32>(
             state.denominator *= u64::from(decoded[lane].frequency);
             out[lane] = decoded[lane].symbol;
         }
+        completed += 4;
     }
-    for symbol in chunks.into_remainder() {
+    for symbol in &mut output[completed..] {
         *symbol = decoder.read(model)?;
     }
     decoder.finish()

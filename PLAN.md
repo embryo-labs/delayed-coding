@@ -81,6 +81,15 @@ rANS matter; SIMD and alias variants remain mandatory before broad claims.
 
 ## Progress
 
+- 2026-09-13: added a bounded branchless four-state decoder, once-per-block table
+  specialization, validated internal scheduling, and opt-in speculative 4/8-state
+  model/event encoding. The `fast_block` example exercises the complete fast path.
+  On book1, four-state direct encoding improves from 7.38 to 4.59 ns/symbol and
+  decoding from 4.18 (previous group) to 3.21. Same-run rANS64 four-state decode
+  is 3.67. Uniform/short records still favor other paths, and encoding still loses
+  to rANS. This is a fixed-model kernel result, not the application milestone.
+  See [speed report](benchmarks/SPEED_KERNELS.md).
+
 - 2026-09-13: exact selected-branch Rust/C encoding now supports original disjoint,
   numerical and raw mappings, including four states. Blitzcrank's opt-in scalar
   encoder calls this once per block, preserving historical files. 20,000 Census

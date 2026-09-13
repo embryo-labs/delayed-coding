@@ -11,6 +11,9 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 delayed-coding = { path = ".." }
 
+[features]
+speculative-encode = ["delayed-coding/speculative-encode"]
+
 [[bin]]
 name = "codec"
 path = "fuzz_targets/codec.rs"
