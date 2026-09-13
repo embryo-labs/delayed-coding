@@ -1,0 +1,5 @@
+input_sha256=9ffa47cd93bccd732f20e0c304203cfbc1b8a91bedac536e2d8f6051003d9951
+CPU=2
+minimum_symbols=16777216
+rounds=5; alternating order; each cell is seven-sample median
+BENCH=/home/yiming/projects/delayed-coding/build-log/compare_rans

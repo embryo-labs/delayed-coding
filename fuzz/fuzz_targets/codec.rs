@@ -61,6 +61,27 @@ fuzz_target!(|data: &[u8]| {
         });
     let output_size = usize::from(data[3]) * 16;
     let payload = &data[4..];
+    #[cfg(feature = "log-schedule")]
+    {
+        let log_model = delayed_coding::LogModel::new(&model.frequencies()).unwrap();
+        let mut out = vec![0; output_size];
+        let _ = log_model.decode_into::<4>(payload, &mut out);
+        let _ = log_model.decode_into::<8>(payload, &mut out);
+        let symbols: Vec<_> = payload
+            .iter()
+            .map(|&b| u32::from(b) % alphabet as u32)
+            .collect();
+        let mut storage = vec![0xa5; symbols.len() * 2 + 1];
+        let range = log_model
+            .encode_into::<4>(&symbols, &mut storage, &mut Workspace::default())
+            .unwrap();
+        assert!(storage[..range.start].iter().all(|&b| b == 0xa5));
+        let mut restored = vec![0; symbols.len()];
+        log_model
+            .decode_into::<4>(&storage[range], &mut restored)
+            .unwrap();
+        assert_eq!(symbols, restored);
+    }
     match (data[1] % 3, data[2] % 2) {
         (0, 0) => exercise::<16, 1>(&model, payload, output_size),
         (0, 1) => exercise::<16, 4>(&model, payload, output_size),

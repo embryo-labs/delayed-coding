@@ -11,7 +11,7 @@ pub struct Event<'a> {
 /// Reuse between calls to avoid reallocating the per-symbol virtual schedule.
 #[derive(Default)]
 pub struct Workspace {
-    virtual_symbols: Vec<u8>,
+    pub(crate) virtual_symbols: Vec<u8>,
 }
 impl Workspace {
     pub fn with_capacity(symbols: usize) -> Self {

@@ -12,3 +12,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 delayed-coding = { path = ".." }
+
+[features]
+log-schedule = ["delayed-coding/log-schedule"]

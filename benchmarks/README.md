@@ -29,13 +29,19 @@ with `CPU=none` for correctness only, not as stable performance measurements.
 New shared-harness rows distinguish provenance:
 
 - `rans_byte_upstream_2`, `rans64_upstream_2`: extracted original two-state loops.
-- `rans64_upstream_style_4`: derived four-state loop, preserving lookup-all,
+- `rans64_upstream_style_4` / `_8`: derived four/eight-state loops, preserving lookup-all,
   step-all, renormalize-all ordering; byte-checked against the generic encoder.
 - `rans_sse41_upstream_8`: extracted original two-group/eight-state SIMD loop.
 - Older `rans64_4`, byte and SSE4 rows: our historical adapters using upstream
   headers, not the complete original demonstration loops.
 
 ## Shared probability / u32 benchmark
+
+The optional logarithmic DC derivative adds `log_dc24_4` and `log_dc24_8` to both
+probability suites. These are **separate-format** rows, not faster implementations
+of the original bitstream. Enable with `-DDELAYED_CODING_LOG_SCHEDULE=ON`; build
+normally, then run the same commands below. CTest checks their roundtrips too.
+See [measurements](LOG_SCHEDULE.md) and [format/proof](../docs/LOG_SCHEDULE.md).
 
 No benchmark dependency is downloaded automatically. For the upstream comparison:
 

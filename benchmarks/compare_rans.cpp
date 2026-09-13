@@ -172,6 +172,28 @@ struct Rans {
 
 #include "ryg_grouped_adapter.h"
 
+#ifdef DELAYED_CODING_HAVE_LOG_SCHEDULE
+struct LogDelayed {
+    DcLogModel* model = nullptr;
+    DcWorkspace* workspace = nullptr;
+    std::vector<uint8_t> storage;
+    unsigned lanes;
+    size_t offset = 0, size = 0;
+    LogDelayed(const Model& m, size_t n, unsigned l) : storage(n*2), lanes(l) {
+        require(dc_log_model_new(m.frequencies.data(), m.frequencies.size(), &model) == DC_OK);
+        require(dc_workspace_new(&workspace) == DC_OK);
+    }
+    ~LogDelayed() { dc_log_model_free(model); dc_workspace_free(workspace); }
+    void encode(const std::vector<uint32_t>& input) {
+        require(dc_log_encode(model, lanes, input.data(), input.size(), storage.data(), storage.size(), workspace, &offset, &size) == DC_OK);
+    }
+    void decode(std::vector<uint32_t>& output) {
+        require(dc_log_decode(model, lanes, storage.data()+offset, size, output.data(), output.size()) == DC_OK);
+    }
+    size_t bytes() const { return size; }
+};
+#endif
+
 template<class Function>
 double median_ns(size_t repeats, Function run) {
     std::vector<double> samples;
@@ -249,6 +271,11 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     measure(distribution, "delayed24_4_branchless", branchless4, input);
     measure(distribution, "delayed24_4_branchless_direct", branchless4_direct, input);
     measure(distribution, "delayed24_4_branchless_both", branchless4_both, input);
+#ifdef DELAYED_CODING_HAVE_LOG_SCHEDULE
+    LogDelayed log4(model, count, 4), log8(model, count, 8);
+    measure(distribution, "log_dc24_4", log4, input);
+    measure(distribution, "log_dc24_8", log8, input);
+#endif
     measure(distribution, "rans_byte_1", b1, input);
     measure(distribution, "rans_byte_4", b4, input);
     measure(distribution, "rans64_1", w1, input);
@@ -256,6 +283,9 @@ static void benchmark_input(const std::string &distribution, const Model &model,
     Rans64Grouped<4> grouped_rans4(model, count);
     grouped_rans4.validate_with_generic(input);
     measure(distribution, "rans64_upstream_style_4", grouped_rans4, input);
+    Rans64Grouped<8> grouped_rans8(model, count);
+    grouped_rans8.validate_with_generic(input);
+    measure(distribution, "rans64_upstream_style_8", grouped_rans8, input);
     OriginalRans<1> original64(model, count);
     measure(distribution, "rans64_upstream_2", original64, input);
     if (*std::max_element(model.frequencies.begin(), model.frequencies.end()) < 65536) {

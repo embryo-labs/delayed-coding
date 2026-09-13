@@ -104,6 +104,20 @@ owns its workspace and each decoder owns its state. The encoder still needs a
 forward scheduling pass and a backward embedding pass; this is not an online
 forward encoder. `24` is the delay threshold, not the probability precision.
 
+An optional **separate-format derivative**, `LogModel`, replaces the exact
+multiplicative capacity schedule with a conservative integer-log schedule.
+It retains the same input probabilities but trades a small rate cost for speed;
+its bytes are not compatible with ordinary DC or Blitzcrank. It supports fixed
+models, 1/2/4/8 lanes, reusable Workspace and bounded Rust/C APIs:
+
+```sh
+cargo run --release --features log-schedule --example log_speed -- /path/to/file
+```
+
+See the [schedule and invertibility argument](docs/LOG_SCHEDULE.md) and
+[measured comparison and limits](benchmarks/LOG_SCHEDULE.md). This experiment is
+off by default and is not selected by the Blitzcrank bridge.
+
 For C/C++:
 
 ```sh

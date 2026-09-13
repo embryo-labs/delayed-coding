@@ -1,6 +1,11 @@
 //! C ABI boundary. The codec itself forbids unsafe code. See include/delayed_coding.h.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+#[cfg(feature = "log-schedule")]
+mod log_schedule;
+#[cfg(feature = "log-schedule")]
+pub use log_schedule::{dc_log_decode, dc_log_encode, dc_log_model_free, dc_log_model_new};
+
 use delayed_coding::decode_branchless4_into;
 use delayed_coding::decode_grouped4_into;
 use delayed_coding::decode_lookahead_interleaved_into;

@@ -37,9 +37,11 @@ jobs:
           components: miri, rust-src, rustfmt
       - run: cargo fmt --manifest-path fuzz/Cargo.toml --check
       - run: cargo miri test -p delayed-coding-ffi --test api
+      - run: cargo miri test -p delayed-coding-ffi --features log-schedule --test log_api
       - run: cargo install cargo-fuzz --version 0.13.2 --locked
       - run: cargo fuzz run codec -- -max_total_time=60 -max_len=4096 -print_final_stats=1
       - run: cargo fuzz run codec --features speculative-encode -- -max_total_time=60 -max_len=4096 -print_final_stats=1
+      - run: cargo fuzz run codec --features log-schedule -- -max_total_time=60 -max_len=4096 -print_final_stats=1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -76,5 +78,6 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DDELAYED_CODING_RANS_DIR="$PWD/upstream-rans"
           -DDELAYED_CODING_BUILD_SIMD_BENCHMARK=ON
+          -DDELAYED_CODING_LOG_SCHEDULE=ON
           -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
       - run: cmake --build build -j2 && ctest --test-dir build --output-on-failure

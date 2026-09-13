@@ -20,7 +20,11 @@
 mod branch;
 mod codec;
 mod layout;
+#[cfg(feature = "log-schedule")]
+mod log_schedule;
 mod model;
+#[cfg(feature = "log-schedule")]
+pub use log_schedule::LogModel;
 
 pub use branch::{Branch, Interval};
 pub use codec::decode_branchless4_into;

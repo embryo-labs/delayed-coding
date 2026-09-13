@@ -13,6 +13,7 @@ delayed-coding = { path = ".." }
 
 [features]
 speculative-encode = ["delayed-coding/speculative-encode"]
+log-schedule = ["delayed-coding/log-schedule"]
 
 [[bin]]
 name = "codec"

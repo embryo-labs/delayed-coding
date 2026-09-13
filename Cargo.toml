@@ -24,6 +24,12 @@ reference-division = []
 flat-alias = []
 # Experimental multi-lane encoder; can regress predictable distributions.
 speculative-encode = []
+# Experimental separate format with a conservative integer-log DC schedule.
+log-schedule = []
+
+[[example]]
+name = "log_speed"
+required-features = ["log-schedule"]
 
 [[bench]]
 name = "throughput"

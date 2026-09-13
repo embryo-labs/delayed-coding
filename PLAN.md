@@ -10,6 +10,12 @@ comparison or treat an alias implementation detail as the algorithmic contributi
 
 ## Architecture
 
+Ongoing speed work: an opt-in logarithmic DC derivative now has Rust/C interfaces
+and independent inverse checks. It is a separate format and remains outside the
+Blitzcrank compatibility path. See [the algorithm](docs/LOG_SCHEDULE.md) and
+[the measured checkpoint](benchmarks/LOG_SCHEDULE.md); original DC and a new
+derivative must not be conflated in speed or format claims.
+
 Latest checkpoint (2026-09-13): [upstream baseline calibration](benchmarks/UPSTREAM_CALIBRATION.md)
 supersedes earlier relative-rANS speed claims. Original programs now run separately;
 shared benchmarks include extracted upstream loops and a labelled four-state

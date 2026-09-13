@@ -10,6 +10,7 @@ extern "C" {
 typedef struct DcModel DcModel;
 typedef struct DcWorkspace DcWorkspace;
 typedef struct DcBranch DcBranch;
+typedef struct DcLogModel DcLogModel;
 typedef struct DcInterval { uint32_t start; uint32_t end; } DcInterval;
 typedef enum DcStatus {
     DC_OK = 0, DC_INVALID_ARGUMENT = 1, DC_INVALID_MODEL = 2,
@@ -33,6 +34,20 @@ DcStatus dc_model_new_with_options(const uint32_t* frequencies, size_t count, ui
 void dc_model_free(DcModel* model);
 DcStatus dc_workspace_new(DcWorkspace** out);
 void dc_workspace_free(DcWorkspace* workspace);
+
+/* OPTIONAL log-schedule feature, SEPARATE EXPERIMENTAL FORMAT. Fixed delay 24,
+ * lanes 1/2/4/8, identical 16-bit frequencies, cumulative intervals and a
+ * conservative logarithmic schedule. Not compatible with dc_encode payloads.
+ * Pointer/ownership rules match ordinary models/encode/decode; bounded reads,
+ * 2*count output capacity and a reusable ordinary DcWorkspace. Symbols below
+ * are linked only when DELAYED_CODING_LOG_SCHEDULE is enabled in CMake. */
+DcStatus dc_log_model_new(const uint32_t* frequencies, size_t count, DcLogModel** out);
+void dc_log_model_free(DcLogModel* model);
+DcStatus dc_log_encode(const DcLogModel* model, uint32_t lanes,
+    const uint32_t* symbols, size_t count, uint8_t* output, size_t capacity,
+    DcWorkspace* workspace, size_t* offset, size_t* size);
+DcStatus dc_log_decode(const DcLogModel* model, uint32_t lanes,
+    const uint8_t* input, size_t size, uint32_t* output, size_t count);
 
 /* Import one selected branch's exact mapping. Intervals must be sorted, disjoint,
  * nonempty and within [0,65536); end may equal 65536. Their lengths must sum to
