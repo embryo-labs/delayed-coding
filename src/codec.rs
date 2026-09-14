@@ -306,6 +306,72 @@ impl<'a, const DELAY: u32, const LANES: usize> Decoder<'a, DELAY, LANES> {
         self.read_mapped(|word| Ok(model.lookup(word)))
     }
 
+    /// Decode using packed decode-only alias metadata; payload unchanged.
+    #[inline(always)]
+    pub fn read_prepared(&mut self, model: &crate::DecodeModel) -> Result<u32, Error> {
+        self.read_mapped(|word| Ok(model.lookup(word)))
+    }
+    /// Decode and directly return an application value from the selected slot.
+    #[inline(always)]
+    pub fn read_value(&mut self, model: &crate::DecodeValueModel) -> Result<u64, Error> {
+        let mut value = 0;
+        self.read_mapped(|word| {
+            let (decoded, v) = model.lookup(word);
+            value = v;
+            Ok(decoded)
+        })?;
+        Ok(value)
+    }
+
+    /// Four mixed-model events. For aligned four-state streams, expose all
+    /// independent capacities/lookups before updating information states.
+    /// Other lane counts/phases retain exactly the scalar event ordering.
+    #[inline(always)]
+    pub fn read_prepared4(&mut self, models: [&crate::DecodeModel; 4]) -> Result<[u32; 4], Error> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        if LANES != 4 || self.lane != 0 || self.input.len() - self.position < 8 {
+            return Ok([
+                self.read_prepared(models[0])?,
+                self.read_prepared(models[1])?,
+                self.read_prepared(models[2])?,
+                self.read_prepared(models[3])?,
+            ]);
+        }
+        // Eight bytes are available, even when some lanes consume a virtual
+        // word. Speculative loads stay strictly inside the input slice.
+        let physical: [usize; 4] =
+            std::array::from_fn(|i| usize::from(self.states[i].denominator < 1u64 << DELAY));
+        let offsets = [
+            0,
+            physical[0],
+            physical[0] + physical[1],
+            physical[0] + physical[1] + physical[2],
+        ];
+        let window = &self.input[self.position..self.position + 8];
+        let mut words = [0u16; 4];
+        for i in 0..4 {
+            let state = &mut self.states[i];
+            let loaded = u16::from_be_bytes([window[2 * offsets[i]], window[2 * offsets[i] + 1]]);
+            let mask = (physical[i] as u16).wrapping_neg();
+            words[i] = (loaded & mask) | (state.numerator as u16 & !mask);
+            let shift = (1 - physical[i]) * 16;
+            state.numerator >>= shift;
+            state.denominator >>= shift;
+        }
+        self.position += (offsets[3] + physical[3]) * 2;
+        let decoded: [_; 4] = std::array::from_fn(|i| models[i].lookup(words[i]));
+        for (state, item) in self.states.iter_mut().zip(&decoded) {
+            state.numerator = state
+                .numerator
+                .wrapping_mul(u64::from(item.frequency))
+                .wrapping_add(u64::from(item.remainder));
+            state.denominator *= u64::from(item.frequency);
+        }
+        Ok(decoded.map(|d| d.symbol))
+    }
+
     /// Read one of `count` contiguous equal-width intervals, preserving the
     /// original numerical/rare-branch mapping. Rejects unused codeword tails.
     #[inline]

@@ -1,5 +1,11 @@
 # Reproducing benchmarks
 
+The [current standalone SIMD measurements](results/2026-09-14-simd-release.json)
+use the promoted [`delayed-coding-simd` companion](../simd/README.md), full
+16-bit probability precision and bounded decoding. The separate
+[AVX-512 co-design report](AVX512.md) describes the historical research prototype
+and hardware analysis; its reduced-precision results are not release claims.
+
 Start with the [upstream calibration report](UPSTREAM_CALIBRATION.md). Historical
 generic rANS adapters are retained as controls, not advertised as upstream-speed
 implementations. The build requires the complete pinned checkout (LF source files);

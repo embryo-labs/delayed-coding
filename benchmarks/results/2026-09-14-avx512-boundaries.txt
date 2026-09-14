@@ -1,0 +1,83 @@
+### book1 / store_floor
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=store_floor taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+store_floor_ns_per_symbol=0.1352
+
+### book1 / copy_floor
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=copy_floor taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+copy_floor_ns_per_symbol=0.2843
+
+### constant / dc16_cumulative_bounded_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_bounded_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_bounded_64,65536,128,16384,0.4259
+rate_control_precision=12,lanes=64,delay16_bytes=128,delay24_bytes=256
+
+### constant / dc16_cumulative_encode_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_encode_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+encode,12,dc16_cumulative_encode_64,65536,128,3072,0.9684
+rate_control_precision=12,lanes=64,delay16_bytes=128,delay24_bytes=256
+
+### near_constant / dc16_cumulative_bounded_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_bounded_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:near_constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_bounded_64,65536,1288,16384,0.4106
+rate_control_precision=12,lanes=64,delay16_bytes=1288,delay24_bytes=1200
+
+### near_constant / dc16_cumulative_encode_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_encode_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:near_constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+encode,12,dc16_cumulative_encode_64,65536,1288,3072,0.9120
+rate_control_precision=12,lanes=64,delay16_bytes=1288,delay24_bytes=1200
+
+### uniform256 / dc16_cumulative_bounded_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_bounded_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:uniform256 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_bounded_64,65536,65730,16384,0.4084
+rate_control_precision=12,lanes=64,delay16_bytes=65730,delay24_bytes=65700
+
+### uniform256 / dc16_cumulative_encode_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_encode_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:uniform256 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+encode,12,dc16_cumulative_encode_64,65536,65730,3072,0.8593
+rate_control_precision=12,lanes=64,delay16_bytes=65730,delay24_bytes=65700
+
+### skewed / dc16_cumulative_bounded_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_bounded_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:skewed 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_bounded_64,65536,41558,16384,0.4011
+rate_control_precision=12,lanes=64,delay16_bytes=41558,delay24_bytes=41092
+
+### skewed / dc16_cumulative_encode_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_encode_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:skewed 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+encode,12,dc16_cumulative_encode_64,65536,41558,3072,0.8720
+rate_control_precision=12,lanes=64,delay16_bytes=41558,delay24_bytes=41092
+
+### constant / dc16_cumulative_avx512_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_avx512_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_avx512_64,65536,128,16384,8.1386
+rate_control_precision=12,lanes=64,delay16_bytes=128,delay24_bytes=256
+
+### near_constant / dc16_cumulative_avx512_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_avx512_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:near_constant 12 65536
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+decode,12,dc16_cumulative_avx512_64,65536,1288,16384,1.3414
+rate_control_precision=12,lanes=64,delay16_bytes=1288,delay24_bytes=1200
+
+### uniform256 / dc16_cumulative_bounded_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_bounded_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:uniform256 12 16
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+rate_control_precision=12,lanes=64,delay16_bytes=32,delay24_bytes=32
+decode,12,dc16_cumulative_bounded_64,16,32,16384,9.1732
+
+### uniform256 / dc16_cumulative_encode_64
+$ env DC_BENCH_MIN_SYMBOLS=16777216 DC_BENCH_CODEC=dc16_cumulative_encode_64 taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype synthetic:uniform256 12 16
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+rate_control_precision=12,lanes=64,delay16_bytes=32,delay24_bytes=32
+encode,12,dc16_cumulative_encode_64,16,32,3072,5.4085

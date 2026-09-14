@@ -40,6 +40,153 @@ pub struct DecodedSymbol {
     pub remainder: u32,
 }
 
+#[derive(Clone, Debug)]
+struct DecodeBucket {
+    slots: [u64; 2],
+    cutoff: u32,
+}
+
+struct ValueBucket {
+    slots: [(u64, u64); 2],
+    cutoff: u32,
+}
+/// Alias metadata and an application-supplied u64 value in the same slot.
+/// Avoids a dependent symbol-to-value lookup (e.g. a numeric dictionary).
+pub struct DecodeValueModel {
+    buckets: Box<[ValueBucket]>,
+    shift: u32,
+    mask: u32,
+}
+impl DecodeValueModel {
+    pub fn new(model: &Model, values: &[u64]) -> Result<Self, Error> {
+        if values.len() != model.alphabet_size() {
+            return Err(Error::InvalidModel);
+        }
+        let decoded = DecodeModel::from_model(model);
+        let buckets = decoded
+            .buckets
+            .iter()
+            .map(|b| ValueBucket {
+                slots: b.slots.map(|entry| (entry, values[entry as usize & 65535])),
+                cutoff: b.cutoff,
+            })
+            .collect();
+        Ok(Self {
+            buckets,
+            shift: decoded.shift,
+            mask: decoded.mask,
+        })
+    }
+    pub fn memory_bytes(&self) -> usize {
+        self.buckets.len() * std::mem::size_of::<ValueBucket>()
+    }
+    #[inline(always)]
+    pub fn lookup(&self, word: u16) -> (DecodedSymbol, u64) {
+        let word = u32::from(word);
+        let bucket = &self.buckets[(word >> self.shift) as usize];
+        let (entry, value) = bucket.slots[usize::from(word & self.mask >= bucket.cutoff)];
+        (
+            DecodedSymbol {
+                symbol: entry as u32 & 65535,
+                frequency: ((entry >> 16) as u32 & 65535) + 1,
+                remainder: word.wrapping_sub((entry >> 32) as u32),
+            },
+            value,
+        )
+    }
+}
+
+/// Decode-only alias model with packed slots. Same exact mapping as `Model`,
+/// no 65536-entry direct LUT, no encoder metadata in the hot structure.
+#[derive(Clone, Debug)]
+pub struct DecodeModel {
+    buckets: Box<[DecodeBucket]>,
+    shift: u32,
+    mask: u32,
+    direct: Box<[u64]>,
+    direct_shift: u32,
+}
+impl DecodeModel {
+    pub fn from_model(model: &Model) -> Self {
+        let pack = |slot: Slot| {
+            u64::from(slot.symbol)
+                | (u64::from(slot.frequency.saturating_sub(1)) << 16)
+                | (u64::from(slot.adjustment as u32) << 32)
+        };
+        #[cfg(not(feature = "flat-alias"))]
+        let buckets = model
+            .buckets
+            .iter()
+            .map(|b| DecodeBucket {
+                slots: [pack(b.left), pack(b.right)],
+                cutoff: b.cutoff,
+            })
+            .collect();
+        #[cfg(feature = "flat-alias")]
+        let buckets = model
+            .cutoffs
+            .iter()
+            .enumerate()
+            .map(|(i, &cutoff)| DecodeBucket {
+                slots: [pack(model.slots[2 * i]), pack(model.slots[2 * i + 1])],
+                cutoff,
+            })
+            .collect();
+        Self {
+            buckets,
+            shift: model.shift,
+            mask: model.mask,
+            direct: Box::default(),
+            direct_shift: 0,
+        }
+    }
+    /// Use an exact direct table only if it needs at most `2^max_bits` entries.
+    /// Aligned frequencies allow a smaller table without quantizing the model.
+    pub fn with_direct_table(mut self, model: &Model, max_bits: u32) -> Self {
+        let low_bits = model
+            .symbols
+            .iter()
+            .filter(|s| s.frequency != 0)
+            .map(|s| s.frequency.trailing_zeros())
+            .min()
+            .unwrap_or(0)
+            .min(model.shift);
+        let bits = 16 - low_bits;
+        if bits <= max_bits.min(16) {
+            self.direct = (0..(1u32 << bits))
+                .map(|i| {
+                    let word = i << low_bits;
+                    let d = model.lookup(word as u16);
+                    u64::from(d.symbol)
+                        | (u64::from(d.frequency - 1) << 16)
+                        | (u64::from(word.wrapping_sub(d.remainder)) << 32)
+                })
+                .collect();
+            self.direct_shift = low_bits;
+            self.buckets = Box::default();
+        }
+        self
+    }
+    pub fn memory_bytes(&self) -> usize {
+        self.buckets.len() * std::mem::size_of::<DecodeBucket>() + self.direct.len() * 8
+    }
+    #[inline(always)]
+    pub fn lookup(&self, word: u16) -> DecodedSymbol {
+        let word = u32::from(word);
+        let entry = if self.direct.is_empty() {
+            let bucket = &self.buckets[(word >> self.shift) as usize];
+            bucket.slots[usize::from(word & self.mask >= bucket.cutoff)]
+        } else {
+            self.direct[(word >> self.direct_shift) as usize]
+        };
+        DecodedSymbol {
+            symbol: entry as u32 & 65535,
+            frequency: ((entry >> 16) as u32 & 65535) + 1,
+            remainder: word.wrapping_sub((entry >> 32) as u32),
+        }
+    }
+}
+
 /// Optional speed/memory tradeoffs. Tables do not change payload bytes.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TableOptions {
@@ -221,6 +368,16 @@ impl Model {
     /// for each observed symbol. Zero counts stay zero. This is a convenience
     /// policy; callers can supply their own normalized frequencies to `new`.
     pub fn normalize(counts: &[u32]) -> Result<Vec<u32>, Error> {
+        Self::normalize_precision(counts, 16)
+    }
+
+    /// Quantize probabilities to `2^bits` units, then scale them to the DC16
+    /// total. This changes compression ratios, never source values. No observed
+    /// symbol is dropped; reject precision too small for the active alphabet.
+    pub fn normalize_precision(counts: &[u32], bits: u32) -> Result<Vec<u32>, Error> {
+        if !(1..=16).contains(&bits) {
+            return Err(Error::InvalidModel);
+        }
         if counts.is_empty() || counts.len() > PROBABILITY_TOTAL as usize {
             return Err(Error::InvalidModel);
         }
@@ -229,7 +386,11 @@ impl Model {
             return Err(Error::InvalidModel);
         }
         let active = counts.iter().filter(|&&c| c != 0).count() as u32;
-        let remaining = PROBABILITY_TOTAL - active;
+        let target = 1u32 << bits;
+        if active > target {
+            return Err(Error::InvalidModel);
+        }
+        let remaining = target - active;
         let mut weights = vec![0; counts.len()];
         let mut remainders = Vec::with_capacity(active as usize);
         let mut assigned = 0;
@@ -243,11 +404,11 @@ impl Model {
             remainders.push((scaled % total, i));
         }
         remainders.sort_unstable_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-        for &(_, i) in remainders
-            .iter()
-            .take((PROBABILITY_TOTAL - assigned) as usize)
-        {
+        for &(_, i) in remainders.iter().take((target - assigned) as usize) {
             weights[i] += 1;
+        }
+        for w in &mut weights {
+            *w <<= 16 - bits;
         }
         Ok(weights)
     }

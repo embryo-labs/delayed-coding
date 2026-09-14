@@ -1,10 +1,14 @@
 # Contributing
 
 Core Rust code must remain safe by default and dependency-free. Isolate C ABI
-unsafe code in `ffi/`, document pointer ownership and prevent Rust panics from
+unsafe code in `ffi/` and CPU intrinsics in the optional `simd/` companion,
+document pointer ownership and prevent Rust panics from
 unwinding through C. Do not add unchecked decoder reads to the default interface.
 
 Before submitting a change:
+
+Use Rust 1.89+ for all-feature SIMD checks. The portable workspace also supports
+Rust 1.88; test that separately without enabling the `avx512` feature.
 
 ```sh
 cargo fmt --all --check

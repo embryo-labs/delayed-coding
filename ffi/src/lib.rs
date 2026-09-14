@@ -192,7 +192,7 @@ pub unsafe extern "C" fn dc_model_new_with_options(
     out: *mut *mut Model,
 ) -> DcStatus {
     guard(|| {
-        if !valid_slice(frequencies, count) || out.is_null() || flags & !3 != 0 {
+        if !valid_slice(frequencies, count) || !valid_slice(out, 1) || flags & !3 != 0 {
             return Err(DcStatus::InvalidArgument);
         }
         unsafe {
@@ -232,7 +232,7 @@ pub unsafe extern "C" fn dc_model_free(model: *mut Model) {
 #[no_mangle]
 pub unsafe extern "C" fn dc_workspace_new(out: *mut *mut Workspace) -> DcStatus {
     guard(|| {
-        if out.is_null() {
+        if !valid_slice(out, 1) {
             return Err(DcStatus::InvalidArgument);
         }
         unsafe {
@@ -292,10 +292,10 @@ pub unsafe extern "C" fn dc_encode_interleaved(
     size: *mut usize,
 ) -> DcStatus {
     guard(|| {
-        if model.is_null()
-            || workspace.is_null()
-            || offset.is_null()
-            || size.is_null()
+        if !valid_slice(model, 1)
+            || !valid_slice(workspace, 1)
+            || !valid_slice(offset, 1)
+            || !valid_slice(size, 1)
             || !valid_slice(symbols, count)
             || !valid_slice(output, capacity)
         {
@@ -434,7 +434,7 @@ unsafe fn decode_dispatch(
     mode: u8,
 ) -> DcStatus {
     guard(|| {
-        if model.is_null() || !valid_slice(input, size) || !valid_slice(output, count) {
+        if !valid_slice(model, 1) || !valid_slice(input, size) || !valid_slice(output, count) {
             return Err(DcStatus::InvalidArgument);
         }
         let model = unsafe { &*model };

@@ -1,0 +1,142 @@
+### p12_decode_cycles
+$ env DC_BENCH_CODEC=dc16_cumulative_bounded_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,instructions:u,branches:u,branch-misses:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+perf_measured_symbols=1878107553
+decode,12,dc16_cumulative_bounded_64,768771,441862,16384,0.3925
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12':
+
+        2277951575      cycles:u
+        4373593931      instructions:u                   #    1.92  insn per cycle
+         264274740      branches:u
+              5724      branch-misses:u                  #    0.00% of all branches
+
+       0.821353693 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys
+
+
+
+### p16_decode_cycles
+$ env DC_BENCH_CODEC=dc16_cumulative_bounded_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,instructions:u,branches:u,branch-misses:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 16
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+perf_measured_symbols=1878107553
+decode,16,dc16_cumulative_bounded_64,768771,441260,524288,0.9202
+rate_control_precision=16,lanes=64,delay16_bytes=441260,delay24_bytes=435296
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 16':
+
+        5340059256      cycles:u
+        4050781047      instructions:u                   #    0.76  insn per cycle
+         264270104      branches:u
+              4974      branch-misses:u                  #    0.00% of all branches
+
+       1.815361783 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys
+
+
+
+### p12_encode_cycles
+$ env DC_BENCH_CODEC=dc16_cumulative_encode_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,instructions:u,branches:u,branch-misses:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+encode,12,dc16_cumulative_encode_64,768771,441862,3072,0.9084
+perf_measured_symbols=1878107553
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12':
+
+        4720622393      cycles:u
+        8569869308      instructions:u                   #    1.82  insn per cycle
+         528387707      branches:u
+             12164      branch-misses:u                  #    0.00% of all branches
+
+       1.770236692 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys
+
+
+
+### p12_decode_ports
+$ env DC_BENCH_CODEC=dc16_cumulative_bounded_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,uops_dispatched.port_0:u,uops_dispatched.port_1:u,uops_dispatched.port_5_11:u,uops_dispatched.port_2_3_10:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+perf_measured_symbols=1878107553
+decode,12,dc16_cumulative_bounded_64,768771,441862,16384,0.3924
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12':
+
+        2277221700      cycles:u
+        1763964956      uops_dispatched.port_0:u
+         232581694      uops_dispatched.port_1:u
+        1869417205      uops_dispatched.port_5_11:u
+        1995920055      uops_dispatched.port_2_3_10:u
+
+       0.820059957 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys
+
+
+
+### p12_decode_stalls
+$ env DC_BENCH_CODEC=dc16_cumulative_bounded_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,cycle_activity.stalls_total:u,cycle_activity.stalls_l1d_miss:u,cycle_activity.stalls_l2_miss:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+perf_measured_symbols=1878107553
+decode,12,dc16_cumulative_bounded_64,768771,441862,16384,0.3924
+rate_control_precision=12,lanes=64,delay16_bytes=441862,delay24_bytes=435842
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 12':
+
+        2276957924      cycles:u
+         106754338      cycle_activity.stalls_total:u
+           3209314      cycle_activity.stalls_l1d_miss:u
+           2789839      cycle_activity.stalls_l2_miss:u
+
+       0.820841386 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys
+
+
+
+### p16_decode_stalls
+$ env DC_BENCH_CODEC=dc16_cumulative_bounded_64 DC_BENCH_MIN_SYMBOLS=268435456 DC_PERF_CTL=/tmp/dc-avx512-perf.fY40LM/control DC_PERF_ACK=/tmp/dc-avx512-perf.fY40LM/ack perf stat -D -1 --control=fifo:/tmp/dc-avx512-perf.fY40LM/control,/tmp/dc-avx512-perf.fY40LM/ack -e '{cycles:u,cycle_activity.stalls_total:u,cycle_activity.stalls_l1d_miss:u,cycle_activity.stalls_l2_miss:u}' taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 16
+Events disabled
+operation,precision,codec,symbols,payload_bytes,kernel_lookup_table_bytes,ns_per_symbol
+Events enabled
+Events disabled
+perf_measured_symbols=1878107553
+decode,16,dc16_cumulative_bounded_64,768771,441260,524288,0.9197
+rate_control_precision=16,lanes=64,delay16_bytes=441260,delay24_bytes=435296
+
+ Performance counter stats for 'taskset -c 2 benchmarks/experiments/avx512-prototype/target/release/dc-avx512-prototype /tmp/blitzcrank-ryg-rans/book1 16':
+
+        5338989025      cycles:u
+        2171833108      cycle_activity.stalls_total:u
+        2133675537      cycle_activity.stalls_l1d_miss:u
+           2267775      cycle_activity.stalls_l2_miss:u
+
+       1.813944059 seconds time elapsed
+
+       0.000000000 seconds user
+       0.000000000 seconds sys

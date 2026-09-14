@@ -3,19 +3,12 @@
 version = 4
 
 [[package]]
+name = "dc-avx512-prototype"
+version = "0.1.0"
+dependencies = [
+ "delayed-coding",
+]
+
+[[package]]
 name = "delayed-coding"
 version = "0.1.0"
-
-[[package]]
-name = "delayed-coding-ffi"
-version = "0.1.0"
-dependencies = [
- "delayed-coding",
-]
-
-[[package]]
-name = "delayed-coding-simd"
-version = "0.1.0"
-dependencies = [
- "delayed-coding",
-]

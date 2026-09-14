@@ -1,0 +1,30 @@
+Date: 2026-09-14 (Asia/Shanghai)
+Source: experiment and report accompanying these results; base HEAD 7e6c5a2b216967682ad33b045cd277f2dea549a1
+Measured binary SHA256: 052682493e7d9193e2a066f016c5c9d9c43cc12cb88437b9ac9c9693bff21fd9
+Final source rebuild reproduced the same binary SHA256.
+Input: /tmp/blitzcrank-ryg-rans/book1, 768771 byte symbols expanded to u32
+Input SHA256: 9ffa47cd93bccd732f20e0c304203cfbc1b8a91bedac536e2d8f6051003d9951
+Upstream data revision: c9d162d996fd600315af9ae8eb89d832576cb32d, unchanged checkout
+CPU: Intel Xeon Platinum 8474C, Sapphire Rapids, CPU 2 affinity
+Cache: 48 KiB L1D, 2 MiB L2 per core
+Frequency: not fixed; turbo/power behavior may differ by kernel and duration
+Compiler: rustc 1.92.0, ded5c06cf21d2b93bffd5d884aa6e96934ee4234, LLVM 21.1.3
+Build: Cargo Release, thin LTO, codegen-units=1, no global native target flags
+Kernel ISA: AVX2, AVX-512F/BW/VL/VBMI2 and POPCNT, runtime checked
+I/O: u32 symbol input/output, big-endian u16 physical words, no input padding
+Selected algorithm: exact capacity DC, delay=16, cumulative mapping, 64 lanes
+Selected encoder: encode64_into, both forward schedule and backward embedding included
+Selected decoder: decode64_bounded, masked physical loads and scalar <64-symbol tail
+Timing includes state initialization, validation, buffer bounds and final checks.
+Model construction, normalization, allocations, file I/O and scalar correctness oracles excluded.
+No assistant compilation/tests/fuzzing concurrent with timed runs; no machine-wide isolation claim.
+Paired table: 5 trials, precision order 12/16 on odd trials and 16/12 on even trials.
+Codec order fixed inside each process; every row median of 7 samples.
+Default sample: 21 complete book1 blocks, 16144191 symbols.
+Counter sample: 349 complete book1 blocks; 7 samples = 1878107553 symbols.
+Counters enabled/disabled with acknowledged perf FIFOs around measurements only.
+Independent post-documentation P12 decoder check: 0.3930 ns/symbol, same binary hash.
+LLVM-MCA: Debian LLVM 23.0.0, sapphirerapids model, 100 iterations of 64-symbol loop.
+ASan: Rust 1.100.0-nightly 809936eac66c547a5127ce1da805f0d3a6789b98, LLVM 23.1.1.
+The prototype and main crate are instrumented by Rust -Zsanitizer=address; std was not rebuilt.
+No AVX-512 rANS control, conditional-model SIMD, C ABI integration or Blitzcrank migration in this experiment.

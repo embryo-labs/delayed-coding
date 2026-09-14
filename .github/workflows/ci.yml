@@ -15,17 +15,27 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           components: rustfmt, clippy
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --all-features --offline --locked -- -D warnings
+      - run: cargo clippy --workspace --all-targets --offline --locked -- -D warnings
+      - if: matrix.toolchain == 'stable'
+        run: cargo clippy --workspace --all-targets --all-features --offline --locked -- -D warnings
       - run: cargo test --workspace --offline --locked
       - run: cargo test --workspace --release --offline --locked
       - run: cargo test --features reference-division --offline --locked
-      - run: cargo test --workspace --all-features --release --offline --locked
+      - run: cargo test -p delayed-coding -p delayed-coding-ffi --all-features --release --offline --locked
+      - if: matrix.toolchain == 'stable'
+        run: cargo test --workspace --all-features --release --offline --locked
       - run: cargo test --workspace --features speculative-encode --offline --locked
       - run: cargo run --example indexed_records --offline --locked
       - run: cargo run --example fast_block --features speculative-encode --offline --locked
       - run: cargo test --example physical_lookahead --offline --locked
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2 && ctest --test-dir build --output-on-failure
       - run: cmake -S tests/cmake_consumer -B build-consumer -DDELAYED_CODING_SOURCE_DIR="$PWD" && cmake --build build-consumer -j2 && ctest --test-dir build-consumer --output-on-failure
+  arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace --all-features --release --locked --offline
   safety:
     runs-on: ubuntu-latest
     timeout-minutes: 20

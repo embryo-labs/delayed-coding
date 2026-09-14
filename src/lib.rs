@@ -23,8 +23,10 @@ mod layout;
 #[cfg(feature = "log-schedule")]
 mod log_schedule;
 mod model;
+mod prepared;
 #[cfg(feature = "log-schedule")]
 pub use log_schedule::LogModel;
+pub use prepared::decode_prepared_into;
 
 pub use branch::{Branch, Interval};
 pub use codec::decode_branchless4_into;
@@ -37,7 +39,9 @@ pub use codec::{
     Decoder, Event, Workspace,
 };
 pub use layout::Layout;
-pub use model::{DecodedSymbol, Model, TableOptions, PROBABILITY_TOTAL};
+pub use model::{
+    DecodeModel, DecodeValueModel, DecodedSymbol, Model, TableOptions, PROBABILITY_TOTAL,
+};
 
 /// All recoverable errors. Allocation failure follows Rust's allocator policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

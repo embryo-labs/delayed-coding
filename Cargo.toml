@@ -5,13 +5,13 @@ edition = "2021"
 rust-version = "1.88"
 license = "MIT"
 description = "Delayed Coding: a standalone entropy coder extracted from Blitzcrank"
-repository = "https://github.com/YimingQiao/delayed-coding"
+repository = "https://github.com/embryo-labs/delayed-coding"
 readme = "README.md"
 keywords = ["compression", "entropy", "coding", "blitzcrank"]
 categories = ["compression", "algorithms"]
 
 [workspace]
-members = ["ffi"]
+members = ["ffi", "simd"]
 exclude = ["fuzz"]
 default-members = ["."]
 resolver = "2"

@@ -1,0 +1,519 @@
+
+[0] Code Region - dc_p12_bounded64
+
+Iterations:        100
+Instructions:      14900
+Total Cycles:      7636
+Total uOps:        22800
+
+Dispatch Width:    6
+uOps Per Cycle:    2.99
+IPC:               1.95
+Block RThroughput: 60.0
+
+
+Cycles with backend pressure increase [ 79.15% ]
+Throughput Bottlenecks:
+  Resource Pressure       [ 65.09% ]
+  - SPRPort00  [ 57.33% ]
+  - SPRPort01  [ 0.68% ]
+  - SPRPort05  [ 21.40% ]
+  - SPRPort06  [ 0.03% ]
+  - SPRPort11  [ 0.03% ]
+  Data Dependencies:      [ 69.42% ]
+  - Register Dependencies [ 69.42% ]
+  - Memory Dependencies   [ 0.00% ]
+
+Critical sequence based on the simulation:
+
+              Instruction                                 Dependency Information
+ +----< 103.  vpmulld	zmm4, zmm21, zmm4
+ |
+ |    < loop carried >
+ |
+ +----> 0.    vpcmpltud	k1, zmm4, zmm6                    ## REGISTER dependency:  zmm4
+ |      1.    kmovw	eax, k1
+ |      2.    popcnt	r14d, eax
+ |      3.    add	r14d, r14d
+ |      4.    mov	r15, rdx
+ |      5.    sub	r15, r9
+ |      6.    mov	al, 6
+ |      7.    cmp	r15, r14
+ |      8.    jb	.Lexit
+ |      9.    knotd	k2, k1
+ |      10.   vmovdqa64	zmm14, zmm5
+ |      11.   vpsrld	zmm14 {k2}, zmm5, 16
+ |      12.   vpsrld	zmm4 {k2}, zmm4, 16
+ |      13.   vpcmpnltud	k0, zmm14, zmm4
+ |      14.   kortestw	k0, k0
+ |      15.   jne	.Lexit
+ +----> 16.   vpexpandw	ymm15 {k1} {z}, ymmword ptr [rsi + r9] ## RESOURCE interference:  SPRPort05 [ probability: 26% ]
+ +----> 17.   vpshufb	ymm15, ymm15, ymm7                ## REGISTER dependency:  ymm15
+ +----> 18.   vpmovzxwd	zmm5 {k1}, ymm15                  ## REGISTER dependency:  ymm15
+ +----> 19.   vpsrld	zmm15, zmm5, 4                    ## REGISTER dependency:  zmm5
+ +----> 20.   vpandd	zmm16, zmm15, zmm8                ## REGISTER dependency:  zmm15
+ |      21.   vpxor	xmm15, xmm15, xmm15
+ |      22.   kxnorw	k1, k0, k0
+ +----> 23.   vpgatherdd	zmm15 {k1}, dword ptr [r11 + 4*zmm16] ## REGISTER dependency:  zmm16
+ |      24.   vpsrld	zmm16, zmm15, 24
+ |      25.   vmovdqu64	zmmword ptr [rcx + 4*r10], zmm16
+ |      26.   add	r14, r9
+ |      27.   vpcmpltud	k1, zmm3, zmm6
+ |      28.   kmovw	r9d, k1
+ |      29.   popcnt	r9d, r9d
+ |      30.   add	r9d, r9d
+ |      31.   mov	r15, rdx
+ |      32.   sub	r15, r14
+ |      33.   cmp	r15, r9
+ |      34.   jb	.Lexit
+ +----> 35.   knotd	k2, k1                            ## RESOURCE interference:  SPRPort00 [ probability: 24% ]
+ |      36.   vmovdqa64	zmm16, zmm13
+ |      37.   vpsrld	zmm16 {k2}, zmm13, 16
+ +----> 38.   vpsrld	zmm3 {k2}, zmm3, 16               ## REGISTER dependency:  k2
+ +----> 39.   vpcmpnltud	k0, zmm16, zmm3                   ## REGISTER dependency:  zmm3
+ |      40.   kortestw	k0, k0
+ |      41.   jne	.Lexit
+ +----> 42.   vpexpandw	ymm17 {k1} {z}, ymmword ptr [rsi + r14] ## RESOURCE interference:  SPRPort05 [ probability: 25% ]
+ +----> 43.   vpshufb	ymm17, ymm17, ymm7                ## REGISTER dependency:  ymm17
+ +----> 44.   vpmovzxwd	zmm13 {k1}, ymm17                 ## REGISTER dependency:  ymm17
+ +----> 45.   vpsrld	zmm17, zmm13, 4                   ## REGISTER dependency:  zmm13
+ +----> 46.   vpandd	zmm18, zmm17, zmm8                ## REGISTER dependency:  zmm17
+ |      47.   vpxord	xmm17, xmm17, xmm17
+ |      48.   kxnorw	k1, k0, k0
+ +----> 49.   vpgatherdd	zmm17 {k1}, dword ptr [r11 + 4*zmm18] ## REGISTER dependency:  zmm18
+ |      50.   vpsrld	zmm18, zmm17, 24
+ |      51.   vmovdqu64	zmmword ptr [rcx + 4*r10 + 64], zmm18
+ |      52.   add	r9, r14
+ |      53.   vpcmpltud	k1, zmm2, zmm6
+ |      54.   kmovw	ebp, k1
+ |      55.   popcnt	r14d, ebp
+ |      56.   add	r14d, r14d
+ |      57.   mov	r15, rdx
+ |      58.   sub	r15, r9
+ |      59.   cmp	r15, r14
+ |      60.   jb	.Lexit
+ |      61.   knotd	k2, k1
+ |      62.   vmovdqa64	zmm18, zmm12
+ |      63.   vpsrld	zmm18 {k2}, zmm12, 16
+ +----> 64.   vpsrld	zmm2 {k2}, zmm2, 16               ## RESOURCE interference:  SPRPort00 [ probability: 25% ]
+ +----> 65.   vpcmpnltud	k0, zmm18, zmm2                   ## REGISTER dependency:  zmm2
+ |      66.   kortestw	k0, k0
+ |      67.   jne	.Lexit
+ |      68.   vpexpandw	ymm19 {k1} {z}, ymmword ptr [rsi + r9]
+ |      69.   vpshufb	ymm19, ymm19, ymm7
+ +----> 70.   vpmovzxwd	zmm12 {k1}, ymm19                 ## RESOURCE interference:  SPRPort05 [ probability: 72% ]
+ +----> 71.   vpsrld	zmm19, zmm12, 4                   ## REGISTER dependency:  zmm12
+ +----> 72.   vpandd	zmm20, zmm19, zmm8                ## REGISTER dependency:  zmm19
+ |      73.   vpxord	xmm19, xmm19, xmm19
+ |      74.   kxnorw	k1, k0, k0
+ +----> 75.   vpgatherdd	zmm19 {k1}, dword ptr [r11 + 4*zmm20] ## REGISTER dependency:  zmm20
+ |      76.   vpsrld	zmm20, zmm19, 24
+ |      77.   vmovdqu64	zmmword ptr [rcx + 4*r10 + 128], zmm20
+ |      78.   add	r14, r9
+ |      79.   vpcmpltud	k1, zmm0, zmm6
+ |      80.   kmovw	r9d, k1
+ |      81.   popcnt	r9d, r9d
+ |      82.   add	r9d, r9d
+ |      83.   mov	r15, rdx
+ |      84.   sub	r15, r14
+ |      85.   cmp	r15, r9
+ |      86.   jb	.Lexit
+ |      87.   knotd	k2, k1
+ |      88.   vmovdqa64	zmm20, zmm1
+ |      89.   vpsrld	zmm20 {k2}, zmm1, 16
+ |      90.   vpsrld	zmm0 {k2}, zmm0, 16
+ |      91.   vpcmpnltud	k0, zmm20, zmm0
+ |      92.   kortestw	k0, k0
+ |      93.   mov	al, 8
+ |      94.   jne	.Lexit
+ |      95.   vpsrld	zmm21, zmm15, 8
+ |      96.   vpandd	zmm21, zmm21, zmm9
+ |      97.   vpaddd	zmm21, zmm21, zmm10
+ |      98.   vpslld	zmm15, zmm15, 4
+ |      99.   vpandd	zmm5, zmm5, zmm11
+ |      100.  vpternlogd	zmm5, zmm15, zmm9, 248
+ |      101.  vpmulld	zmm14, zmm21, zmm14
+ |      102.  vpaddd	zmm5, zmm5, zmm14
+ |      103.  vpmulld	zmm4, zmm21, zmm4
+ |      104.  vpsrld	zmm14, zmm17, 8
+ |      105.  vpandd	zmm14, zmm14, zmm9
+ |      106.  vpaddd	zmm15, zmm14, zmm10
+ |      107.  vpslld	zmm14, zmm17, 4
+ |      108.  vpandd	zmm14, zmm14, zmm9
+ |      109.  vpmulld	zmm16, zmm15, zmm16
+ |      110.  vpaddd	zmm14, zmm16, zmm14
+ |      111.  vpternlogd	zmm14, zmm13, zmm11, 248
+ |      112.  vpmulld	zmm3, zmm15, zmm3
+ +----> 113.  vpsrld	zmm13, zmm19, 8                   ## REGISTER dependency:  zmm19
+ +----> 114.  vpandd	zmm13, zmm13, zmm9                ## REGISTER dependency:  zmm13
+ +----> 115.  vpaddd	zmm13, zmm13, zmm10               ## REGISTER dependency:  zmm13
+ |      116.  vpslld	zmm15, zmm19, 4
+ |      117.  vpandd	zmm15, zmm15, zmm9
+ |      118.  vpmulld	zmm16, zmm13, zmm18
+ |      119.  vpaddd	zmm15, zmm16, zmm15
+ |      120.  vpternlogd	zmm15, zmm12, zmm11, 248
+ +----> 121.  vpmulld	zmm2, zmm13, zmm2                 ## REGISTER dependency:  zmm13
+ |      122.  vpexpandw	ymm12 {k1} {z}, ymmword ptr [rsi + r14]
+ |      123.  vpshufb	ymm12, ymm12, ymm7
+ |      124.  vmovdqa64	zmm13, zmm1
+ |      125.  vpmovzxwd	zmm13 {k1}, ymm12
+ |      126.  vpsrld	zmm1, zmm13, 4
+ |      127.  vpandd	zmm1, zmm1, zmm8
+ |      128.  vpxor	xmm12, xmm12, xmm12
+ |      129.  kxnorw	k1, k0, k0
+ +----> 130.  vpgatherdd	zmm12 {k1}, dword ptr [r11 + 4*zmm1] ## RESOURCE interference:  SPRPort00 [ probability: 25% ]
+ +----> 131.  vpsrld	zmm1, zmm12, 8                    ## REGISTER dependency:  zmm12
+ +----> 132.  vpandd	zmm1, zmm1, zmm9                  ## REGISTER dependency:  zmm1
+ +----> 133.  vpaddd	zmm16, zmm1, zmm10                ## REGISTER dependency:  zmm1
+ |      134.  vpslld	zmm1, zmm12, 4
+ |      135.  vpandd	zmm1, zmm1, zmm9
+ |      136.  vpsrld	zmm12, zmm12, 24
+ |      137.  vpmulld	zmm17, zmm16, zmm20
+ |      138.  vpaddd	zmm1, zmm17, zmm1
+ |      139.  vpternlogd	zmm1, zmm13, zmm11, 248
+ +----> 140.  vpmulld	zmm0, zmm16, zmm0                 ## REGISTER dependency:  zmm16
+ |      141.  vmovdqu64	zmmword ptr [rcx + 4*r10 + 192], zmm12
+ |      142.  add	r9, r14
+ |      143.  add	r10, 64
+ |      144.  add	rbx, -64
+ |      145.  vmovdqa64	zmm12, zmm15
+ |      146.  vmovdqa64	zmm13, zmm14
+ |      147.  cmp	rbx, 63
+ |      148.  ja	.Lloop
+ |
+ |    < loop carried >
+ |
+ +----> 79.   vpcmpltud	k1, zmm0, zmm6                    ## REGISTER dependency:  zmm0
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      3     1.00                        vpcmpltud	k1, zmm4, zmm6
+ 1      3     1.00                        kmovw	eax, k1
+ 1      3     1.00                        popcnt	r14d, eax
+ 1      1     0.20                        add	r14d, r14d
+ 0      1     0.00                        mov	r15, rdx
+ 1      1     0.20                        sub	r15, r9
+ 1      1     0.20                        mov	al, 6
+ 1      1     0.20                        cmp	r15, r14
+ 1      1     0.50                        jb	.Lexit
+ 1      1     1.00                        knotd	k2, k1
+ 0      1     0.00                        vmovdqa64	zmm14, zmm5
+ 1      1     1.00                        vpsrld	zmm14 {k2}, zmm5, 16
+ 1      1     1.00                        vpsrld	zmm4 {k2}, zmm4, 16
+ 1      3     1.00                        vpcmpnltud	k0, zmm14, zmm4
+ 1      3     1.00                        kortestw	k0, k0
+ 1      1     0.50                        jne	.Lexit
+ 3      13    2.00    *                   vpexpandw	ymm15 {k1} {z}, ymmword ptr [rsi + r9]
+ 1      1     0.50                        vpshufb	ymm15, ymm15, ymm7
+ 1      3     1.00                        vpmovzxwd	zmm5 {k1}, ymm15
+ 1      1     1.00                        vpsrld	zmm15, zmm5, 4
+ 1      1     0.50                        vpandd	zmm16, zmm15, zmm8
+ 1      1     0.33                        vpxor	xmm15, xmm15, xmm15
+ 1      1     1.00                        kxnorw	k1, k0, k0
+ 19     30    5.33    *                   vpgatherdd	zmm15 {k1}, dword ptr [r11 + 4*zmm16]
+ 1      1     1.00                        vpsrld	zmm16, zmm15, 24
+ 2      12    0.50           *            vmovdqu64	zmmword ptr [rcx + 4*r10], zmm16
+ 1      1     0.20                        add	r14, r9
+ 1      3     1.00                        vpcmpltud	k1, zmm3, zmm6
+ 1      3     1.00                        kmovw	r9d, k1
+ 1      3     1.00                        popcnt	r9d, r9d
+ 1      1     0.20                        add	r9d, r9d
+ 0      1     0.00                        mov	r15, rdx
+ 1      1     0.20                        sub	r15, r14
+ 1      1     0.20                        cmp	r15, r9
+ 1      1     0.50                        jb	.Lexit
+ 1      1     1.00                        knotd	k2, k1
+ 0      1     0.00                        vmovdqa64	zmm16, zmm13
+ 1      1     1.00                        vpsrld	zmm16 {k2}, zmm13, 16
+ 1      1     1.00                        vpsrld	zmm3 {k2}, zmm3, 16
+ 1      3     1.00                        vpcmpnltud	k0, zmm16, zmm3
+ 1      3     1.00                        kortestw	k0, k0
+ 1      1     0.50                        jne	.Lexit
+ 3      13    2.00    *                   vpexpandw	ymm17 {k1} {z}, ymmword ptr [rsi + r14]
+ 1      1     0.50                        vpshufb	ymm17, ymm17, ymm7
+ 1      3     1.00                        vpmovzxwd	zmm13 {k1}, ymm17
+ 1      1     1.00                        vpsrld	zmm17, zmm13, 4
+ 1      1     0.50                        vpandd	zmm18, zmm17, zmm8
+ 1      1     0.33                        vpxord	xmm17, xmm17, xmm17
+ 1      1     1.00                        kxnorw	k1, k0, k0
+ 19     30    5.33    *                   vpgatherdd	zmm17 {k1}, dword ptr [r11 + 4*zmm18]
+ 1      1     1.00                        vpsrld	zmm18, zmm17, 24
+ 2      12    0.50           *            vmovdqu64	zmmword ptr [rcx + 4*r10 + 64], zmm18
+ 1      1     0.20                        add	r9, r14
+ 1      3     1.00                        vpcmpltud	k1, zmm2, zmm6
+ 1      3     1.00                        kmovw	ebp, k1
+ 1      3     1.00                        popcnt	r14d, ebp
+ 1      1     0.20                        add	r14d, r14d
+ 0      1     0.00                        mov	r15, rdx
+ 1      1     0.20                        sub	r15, r9
+ 1      1     0.20                        cmp	r15, r14
+ 1      1     0.50                        jb	.Lexit
+ 1      1     1.00                        knotd	k2, k1
+ 0      1     0.00                        vmovdqa64	zmm18, zmm12
+ 1      1     1.00                        vpsrld	zmm18 {k2}, zmm12, 16
+ 1      1     1.00                        vpsrld	zmm2 {k2}, zmm2, 16
+ 1      3     1.00                        vpcmpnltud	k0, zmm18, zmm2
+ 1      3     1.00                        kortestw	k0, k0
+ 1      1     0.50                        jne	.Lexit
+ 3      13    2.00    *                   vpexpandw	ymm19 {k1} {z}, ymmword ptr [rsi + r9]
+ 1      1     0.50                        vpshufb	ymm19, ymm19, ymm7
+ 1      3     1.00                        vpmovzxwd	zmm12 {k1}, ymm19
+ 1      1     1.00                        vpsrld	zmm19, zmm12, 4
+ 1      1     0.50                        vpandd	zmm20, zmm19, zmm8
+ 1      1     0.33                        vpxord	xmm19, xmm19, xmm19
+ 1      1     1.00                        kxnorw	k1, k0, k0
+ 19     30    5.33    *                   vpgatherdd	zmm19 {k1}, dword ptr [r11 + 4*zmm20]
+ 1      1     1.00                        vpsrld	zmm20, zmm19, 24
+ 2      12    0.50           *            vmovdqu64	zmmword ptr [rcx + 4*r10 + 128], zmm20
+ 1      1     0.20                        add	r14, r9
+ 1      3     1.00                        vpcmpltud	k1, zmm0, zmm6
+ 1      3     1.00                        kmovw	r9d, k1
+ 1      3     1.00                        popcnt	r9d, r9d
+ 1      1     0.20                        add	r9d, r9d
+ 0      1     0.00                        mov	r15, rdx
+ 1      1     0.20                        sub	r15, r14
+ 1      1     0.20                        cmp	r15, r9
+ 1      1     0.50                        jb	.Lexit
+ 1      1     1.00                        knotd	k2, k1
+ 0      1     0.00                        vmovdqa64	zmm20, zmm1
+ 1      1     1.00                        vpsrld	zmm20 {k2}, zmm1, 16
+ 1      1     1.00                        vpsrld	zmm0 {k2}, zmm0, 16
+ 1      3     1.00                        vpcmpnltud	k0, zmm20, zmm0
+ 1      3     1.00                        kortestw	k0, k0
+ 1      1     0.20                        mov	al, 8
+ 1      1     0.50                        jne	.Lexit
+ 1      1     1.00                        vpsrld	zmm21, zmm15, 8
+ 1      1     0.50                        vpandd	zmm21, zmm21, zmm9
+ 1      1     0.50                        vpaddd	zmm21, zmm21, zmm10
+ 1      1     1.00                        vpslld	zmm15, zmm15, 4
+ 1      1     0.50                        vpandd	zmm5, zmm5, zmm11
+ 1      1     0.50                        vpternlogd	zmm5, zmm15, zmm9, 248
+ 2      10    2.00                        vpmulld	zmm14, zmm21, zmm14
+ 1      1     0.50                        vpaddd	zmm5, zmm5, zmm14
+ 2      10    2.00                        vpmulld	zmm4, zmm21, zmm4
+ 1      1     1.00                        vpsrld	zmm14, zmm17, 8
+ 1      1     0.50                        vpandd	zmm14, zmm14, zmm9
+ 1      1     0.50                        vpaddd	zmm15, zmm14, zmm10
+ 1      1     1.00                        vpslld	zmm14, zmm17, 4
+ 1      1     0.50                        vpandd	zmm14, zmm14, zmm9
+ 2      10    2.00                        vpmulld	zmm16, zmm15, zmm16
+ 1      1     0.50                        vpaddd	zmm14, zmm16, zmm14
+ 1      1     0.50                        vpternlogd	zmm14, zmm13, zmm11, 248
+ 2      10    2.00                        vpmulld	zmm3, zmm15, zmm3
+ 1      1     1.00                        vpsrld	zmm13, zmm19, 8
+ 1      1     0.50                        vpandd	zmm13, zmm13, zmm9
+ 1      1     0.50                        vpaddd	zmm13, zmm13, zmm10
+ 1      1     1.00                        vpslld	zmm15, zmm19, 4
+ 1      1     0.50                        vpandd	zmm15, zmm15, zmm9
+ 2      10    2.00                        vpmulld	zmm16, zmm13, zmm18
+ 1      1     0.50                        vpaddd	zmm15, zmm16, zmm15
+ 1      1     0.50                        vpternlogd	zmm15, zmm12, zmm11, 248
+ 2      10    2.00                        vpmulld	zmm2, zmm13, zmm2
+ 3      13    2.00    *                   vpexpandw	ymm12 {k1} {z}, ymmword ptr [rsi + r14]
+ 1      1     0.50                        vpshufb	ymm12, ymm12, ymm7
+ 0      1     0.00                        vmovdqa64	zmm13, zmm1
+ 1      3     1.00                        vpmovzxwd	zmm13 {k1}, ymm12
+ 1      1     1.00                        vpsrld	zmm1, zmm13, 4
+ 1      1     0.50                        vpandd	zmm1, zmm1, zmm8
+ 1      1     0.33                        vpxor	xmm12, xmm12, xmm12
+ 1      1     1.00                        kxnorw	k1, k0, k0
+ 19     30    5.33    *                   vpgatherdd	zmm12 {k1}, dword ptr [r11 + 4*zmm1]
+ 1      1     1.00                        vpsrld	zmm1, zmm12, 8
+ 1      1     0.50                        vpandd	zmm1, zmm1, zmm9
+ 1      1     0.50                        vpaddd	zmm16, zmm1, zmm10
+ 1      1     1.00                        vpslld	zmm1, zmm12, 4
+ 1      1     0.50                        vpandd	zmm1, zmm1, zmm9
+ 1      1     1.00                        vpsrld	zmm12, zmm12, 24
+ 2      10    2.00                        vpmulld	zmm17, zmm16, zmm20
+ 1      1     0.50                        vpaddd	zmm1, zmm17, zmm1
+ 1      1     0.50                        vpternlogd	zmm1, zmm13, zmm11, 248
+ 2      10    2.00                        vpmulld	zmm0, zmm16, zmm0
+ 2      12    0.50           *            vmovdqu64	zmmword ptr [rcx + 4*r10 + 192], zmm12
+ 1      1     0.20                        add	r9, r14
+ 0      1     0.00                        add	r10, 64
+ 0      1     0.00                        add	rbx, -64
+ 0      1     0.00                        vmovdqa64	zmm12, zmm15
+ 0      1     0.00                        vmovdqa64	zmm13, zmm14
+ 1      1     0.20                        cmp	rbx, 63
+ 1      1     0.50                        ja	.Lloop
+
+
+Resources:
+[0]   - SPRPort00
+[1]   - SPRPort01
+[2]   - SPRPort02
+[3]   - SPRPort03
+[4]   - SPRPort04
+[5]   - SPRPort05
+[6]   - SPRPort06
+[7]   - SPRPort07
+[8]   - SPRPort08
+[9]   - SPRPort09
+[10]  - SPRPort10
+[11]  - SPRPort11
+[12]  - SPRPortInvalid
+
+
+Resource pressure per iteration:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12]
+66.78  15.44  22.76  22.61  2.00   46.50  12.77  2.00   2.00   2.00   22.63  10.51   -
+
+Resource pressure by instruction:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12]   Instructions:
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpltud	k1, zmm4, zmm6
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kmovw	eax, k1
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     popcnt	r14d, eax
+ -      -      -      -      -      -      -      -      -      -      -     1.00    -     add	r14d, r14d
+ -      -      -      -      -      -      -      -      -      -      -      -      -     mov	r15, rdx
+ -     0.48    -      -      -     0.26   0.01    -      -      -      -     0.25    -     sub	r15, r9
+ -     0.74    -      -      -      -      -      -      -      -      -     0.26    -     mov	al, 6
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     cmp	r15, r14
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jb	.Lexit
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     knotd	k2, k1
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm14, zmm5
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm14 {k2}, zmm5, 16
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm4 {k2}, zmm4, 16
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpnltud	k0, zmm14, zmm4
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kortestw	k0, k0
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jne	.Lexit
+ -      -     0.33   0.34    -     2.00    -      -      -      -     0.33    -      -     vpexpandw	ymm15 {k1} {z}, ymmword ptr [rsi + r9]
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpshufb	ymm15, ymm15, ymm7
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpmovzxwd	zmm5 {k1}, ymm15
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm15, zmm5, 4
+0.24    -      -      -      -     0.76    -      -      -      -      -      -      -     vpandd	zmm16, zmm15, zmm8
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpxor	xmm15, xmm15, xmm15
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kxnorw	k1, k0, k0
+1.00    -     5.44   5.28    -     2.00    -      -      -      -     5.28    -      -     vpgatherdd	zmm15 {k1}, dword ptr [r11 + 4*zmm16]
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm16, zmm15, 24
+ -      -      -      -      -      -      -      -     1.00   1.00    -      -      -     vmovdqu64	zmmword ptr [rcx + 4*r10], zmm16
+ -     0.25    -      -      -      -      -      -      -      -      -     0.75    -     add	r14, r9
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpltud	k1, zmm3, zmm6
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kmovw	r9d, k1
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     popcnt	r9d, r9d
+ -      -      -      -      -      -     0.25    -      -      -      -     0.75    -     add	r9d, r9d
+ -      -      -      -      -      -      -      -      -      -      -      -      -     mov	r15, rdx
+ -      -      -      -      -     0.50    -      -      -      -      -     0.50    -     sub	r15, r14
+ -     0.50    -      -      -     0.24    -      -      -      -      -     0.26    -     cmp	r15, r9
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jb	.Lexit
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     knotd	k2, k1
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm16, zmm13
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm16 {k2}, zmm13, 16
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm3 {k2}, zmm3, 16
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpnltud	k0, zmm16, zmm3
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kortestw	k0, k0
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jne	.Lexit
+ -      -     0.33   0.35    -     2.00    -      -      -      -     0.32    -      -     vpexpandw	ymm17 {k1} {z}, ymmword ptr [rsi + r14]
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpshufb	ymm17, ymm17, ymm7
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpmovzxwd	zmm13 {k1}, ymm17
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm17, zmm13, 4
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpandd	zmm18, zmm17, zmm8
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpxord	xmm17, xmm17, xmm17
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kxnorw	k1, k0, k0
+1.00    -     5.28   5.44    -     2.00    -      -      -      -     5.28    -      -     vpgatherdd	zmm17 {k1}, dword ptr [r11 + 4*zmm18]
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm18, zmm17, 24
+ -      -      -      -     1.00    -      -     1.00    -      -      -      -      -     vmovdqu64	zmmword ptr [rcx + 4*r10 + 64], zmm18
+ -     0.24    -      -      -      -     0.26    -      -      -      -     0.50    -     add	r9, r14
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpltud	k1, zmm2, zmm6
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kmovw	ebp, k1
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     popcnt	r14d, ebp
+ -      -      -      -      -      -      -      -      -      -      -     1.00    -     add	r14d, r14d
+ -      -      -      -      -      -      -      -      -      -      -      -      -     mov	r15, rdx
+ -     0.98    -      -      -     0.01    -      -      -      -      -     0.01    -     sub	r15, r9
+ -      -      -      -      -      -      -      -      -      -      -     1.00    -     cmp	r15, r14
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jb	.Lexit
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     knotd	k2, k1
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm18, zmm12
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm18 {k2}, zmm12, 16
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm2 {k2}, zmm2, 16
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpnltud	k0, zmm18, zmm2
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kortestw	k0, k0
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jne	.Lexit
+ -      -     0.33   0.32    -     2.00    -      -      -      -     0.35    -      -     vpexpandw	ymm19 {k1} {z}, ymmword ptr [rsi + r9]
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpshufb	ymm19, ymm19, ymm7
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpmovzxwd	zmm12 {k1}, ymm19
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm19, zmm12, 4
+0.25    -      -      -      -     0.75    -      -      -      -      -      -      -     vpandd	zmm20, zmm19, zmm8
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpxord	xmm19, xmm19, xmm19
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kxnorw	k1, k0, k0
+1.00    -     5.44   5.44    -     2.00    -      -      -      -     5.12    -      -     vpgatherdd	zmm19 {k1}, dword ptr [r11 + 4*zmm20]
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm20, zmm19, 24
+ -      -      -      -      -      -      -      -     1.00   1.00    -      -      -     vmovdqu64	zmmword ptr [rcx + 4*r10 + 128], zmm20
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     add	r14, r9
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpltud	k1, zmm0, zmm6
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kmovw	r9d, k1
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     popcnt	r9d, r9d
+ -      -      -      -      -      -      -      -      -      -      -     1.00    -     add	r9d, r9d
+ -      -      -      -      -      -      -      -      -      -      -      -      -     mov	r15, rdx
+ -     0.25    -      -      -     0.25    -      -      -      -      -     0.50    -     sub	r15, r14
+ -      -      -      -      -      -      -      -      -      -      -     1.00    -     cmp	r15, r9
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jb	.Lexit
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     knotd	k2, k1
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm20, zmm1
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm20 {k2}, zmm1, 16
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm0 {k2}, zmm0, 16
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpcmpnltud	k0, zmm20, zmm0
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kortestw	k0, k0
+ -     0.01    -      -      -      -      -      -      -      -      -     0.99    -     mov	al, 8
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     jne	.Lexit
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm21, zmm15, 8
+0.25    -      -      -      -     0.75    -      -      -      -      -      -      -     vpandd	zmm21, zmm21, zmm9
+0.25    -      -      -      -     0.75    -      -      -      -      -      -      -     vpaddd	zmm21, zmm21, zmm10
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	zmm15, zmm15, 4
+0.51    -      -      -      -     0.49    -      -      -      -      -      -      -     vpandd	zmm5, zmm5, zmm11
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpternlogd	zmm5, zmm15, zmm9, 248
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm14, zmm21, zmm14
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpaddd	zmm5, zmm5, zmm14
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm4, zmm21, zmm4
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm14, zmm17, 8
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpandd	zmm14, zmm14, zmm9
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpaddd	zmm15, zmm14, zmm10
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	zmm14, zmm17, 4
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpandd	zmm14, zmm14, zmm9
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm16, zmm15, zmm16
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpaddd	zmm14, zmm16, zmm14
+0.25    -      -      -      -     0.75    -      -      -      -      -      -      -     vpternlogd	zmm14, zmm13, zmm11, 248
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm3, zmm15, zmm3
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm13, zmm19, 8
+0.26    -      -      -      -     0.74    -      -      -      -      -      -      -     vpandd	zmm13, zmm13, zmm9
+0.26    -      -      -      -     0.74    -      -      -      -      -      -      -     vpaddd	zmm13, zmm13, zmm10
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	zmm15, zmm19, 4
+0.74    -      -      -      -     0.26    -      -      -      -      -      -      -     vpandd	zmm15, zmm15, zmm9
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm16, zmm13, zmm18
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpaddd	zmm15, zmm16, zmm15
+0.01    -      -      -      -     0.99    -      -      -      -      -      -      -     vpternlogd	zmm15, zmm12, zmm11, 248
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm2, zmm13, zmm2
+ -      -     0.33   0.32    -     2.00    -      -      -      -     0.35    -      -     vpexpandw	ymm12 {k1} {z}, ymmword ptr [rsi + r14]
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpshufb	ymm12, ymm12, ymm7
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm13, zmm1
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpmovzxwd	zmm13 {k1}, ymm12
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm1, zmm13, 4
+0.50    -      -      -      -     0.50    -      -      -      -      -      -      -     vpandd	zmm1, zmm1, zmm8
+0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vpxor	xmm12, xmm12, xmm12
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     kxnorw	k1, k0, k0
+1.00    -     5.28   5.12    -     2.00    -      -      -      -     5.60    -      -     vpgatherdd	zmm12 {k1}, dword ptr [r11 + 4*zmm1]
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm1, zmm12, 8
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpandd	zmm1, zmm1, zmm9
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpaddd	zmm16, zmm1, zmm10
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	zmm1, zmm12, 4
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpandd	zmm1, zmm1, zmm9
+1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	zmm12, zmm12, 24
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm17, zmm16, zmm20
+0.25    -      -      -      -     0.75    -      -      -      -      -      -      -     vpaddd	zmm1, zmm17, zmm1
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -     vpternlogd	zmm1, zmm13, zmm11, 248
+2.00    -      -      -      -      -      -      -      -      -      -      -      -     vpmulld	zmm0, zmm16, zmm0
+ -      -      -      -     1.00    -      -     1.00    -      -      -      -      -     vmovdqu64	zmmword ptr [rcx + 4*r10 + 192], zmm12
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     add	r9, r14
+ -      -      -      -      -      -      -      -      -      -      -      -      -     add	r10, 64
+ -      -      -      -      -      -      -      -      -      -      -      -      -     add	rbx, -64
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm12, zmm15
+ -      -      -      -      -      -      -      -      -      -      -      -      -     vmovdqa64	zmm13, zmm14
+ -      -      -      -      -     0.01   0.25    -      -      -      -     0.74    -     cmp	rbx, 63
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -     ja	.Lloop

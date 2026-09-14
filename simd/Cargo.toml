@@ -1,0 +1,16 @@
+[package]
+name = "delayed-coding-simd"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+description = "Opt-in DC16 block codec with runtime AVX-512 and scalar fallback"
+repository = "https://github.com/embryo-labs/delayed-coding"
+
+[dependencies]
+delayed-coding = { path = "..", version = "0.1.0" }
+
+[features]
+default = []
+# Rust 1.89+ is required only when enabling the stabilized AVX-512 intrinsics.
+avx512 = []
