@@ -510,8 +510,10 @@ pub fn decode_lookahead_interleaved_into<const DELAY: u32, const LANES: usize>(
         return Err(Error::InvalidLanes);
     }
     let mut physical = input
-        .chunks_exact(2)
-        .map(|bytes| model.lookup(u16::from_be_bytes([bytes[0], bytes[1]])));
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&bytes| model.lookup(u16::from_be_bytes(bytes)));
     let mut pending = physical.next();
     let mut position = 0usize;
     let mut states = [CodingState {

@@ -32,10 +32,12 @@ fn batched<const BATCH: usize>(
                     return Err(Error::TruncatedInput);
                 }
                 // No information-state dependency between these lookups.
-                for (slot, bytes) in pending[..available]
-                    .iter_mut()
-                    .zip(input[cursor..cursor + available * 2].chunks_exact(2))
-                {
+                for (slot, bytes) in pending[..available].iter_mut().zip(
+                    input[cursor..cursor + available * 2]
+                        .as_chunks::<2>()
+                        .0
+                        .iter(),
+                ) {
                     *slot = model.lookup(u16::from_be_bytes([bytes[0], bytes[1]]));
                 }
                 cursor += available * 2;

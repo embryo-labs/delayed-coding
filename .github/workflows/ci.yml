@@ -6,6 +6,7 @@ jobs:
   rust:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         toolchain: ["1.88.0", stable]
     steps:

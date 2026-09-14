@@ -35,6 +35,9 @@ reports are retained as evidence, not presented as current release claims.
   No CPU-specific file marker, silent precision reduction or default SIMD switch.
 - Rust 1.88 remains the portable MSRV; AVX-512 uses stabilized intrinsics requiring
   1.89+. CI separates those feature sets and adds a native ARM fallback job.
+- The first cloud run passed native ARM and legacy differential tests but exposed
+  a new Rust 1.98 Clippy rule. Constant word iterators now use `as_chunks`, retaining
+  identical odd-tail handling; Rust 1.88 and current-toolchain checks were rerun.
 
 ## Local verification completed
 

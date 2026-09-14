@@ -42,7 +42,11 @@ fn branch_handles_and_batch_encoding() {
                 );
                 assert_eq!((offset, size), (1, 34));
                 assert_eq!(output[0], 0xa5);
-                assert!(output[1..].chunks_exact(2).all(|b| b == [0, 123]));
+                assert!(output[1..]
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .all(|b| *b == [0, 123]));
                 output.fill(0xa5);
                 assert_eq!(
                     dc_encode_branches(
